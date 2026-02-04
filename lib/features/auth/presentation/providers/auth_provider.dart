@@ -1,9 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/entities.dart';
-import '../../data/dummy_data/dummy_users.dart';
+import '../../domain/repositories/auth_repository.dart';
+import '../../data/providers/auth_data_providers.dart';
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  return AuthNotifier();
+  final repository = ref.watch(authRepositoryProvider);
+  return AuthNotifier(repository);
 });
 
 final currentUserProvider = Provider<User?>((ref) {
@@ -19,77 +21,89 @@ final loginModeProvider = Provider<LoginMode>((ref) {
 });
 
 class AuthNotifier extends StateNotifier<AuthState> {
-  AuthNotifier() : super(AuthState.initial());
+  final AuthRepository _repository;
+
+  AuthNotifier(this._repository) : super(AuthState.initial());
 
   void setLoginMode(LoginMode mode) {
     state = state.copyWith(loginMode: mode);
   }
 
-  Future<bool> loginWithPasscode(String passcode) async {
+  Future<bool> loginWithPasscode(
+    String passcode, {
+    String? employeeCode,
+  }) async {
+    // For PIN-based login, we need both employee code and PIN
+    // If no employee code provided, use a default one for testing
+    // In production, this should come from a separate input or stored preference
+    return loginWithPin(
+      pin: passcode,
+      employeeCode:
+          employeeCode ?? 'CAP0023', // Default employee code for testing
+    );
+  }
+
+  Future<bool> loginWithPin({required String pin, String? employeeCode}) async {
     state = state.copyWith(status: AuthStatus.loading);
-    
-    // Simulate API call delay
-    await Future.delayed(const Duration(milliseconds: 500));
-    
-    final user = DummyUsers.findByPasscode(passcode);
-    
-    if (user != null) {
-      state = AuthState.authenticated(
-        user: user.copyWith(lastLoginAt: DateTime.now()),
-        token: 'dummy_token_${user.id}',
-        refreshToken: 'dummy_refresh_${user.id}',
+
+    try {
+      // If no employee code provided, use pin as employee code for backward compatibility
+      final result = await _repository.loginWithPin(
+        employeeCode: employeeCode ?? 'CAP0023',
+        pin: pin,
       );
-      return true;
-    } else {
+
+      if (result.isSuccess) {
+        state = AuthState.authenticated(
+          user: result.user!,
+          token: result.accessToken!,
+          refreshToken: result.refreshToken!,
+        );
+        return true;
+      } else {
+        state = state.copyWith(
+          status: AuthStatus.error,
+          errorMessage: result.error ?? 'Login failed. Please try again.',
+        );
+        return false;
+      }
+    } catch (e) {
       state = state.copyWith(
         status: AuthStatus.error,
-        errorMessage: 'Invalid passcode. Please try again.',
+        errorMessage: 'An unexpected error occurred',
       );
       return false;
     }
   }
 
-  Future<bool> loginWithPin(String pin) async {
+  Future<bool> loginWithCredentials(String email, String password) async {
     state = state.copyWith(status: AuthStatus.loading);
-    
-    await Future.delayed(const Duration(milliseconds: 500));
-    
-    final user = DummyUsers.findByPin(pin);
-    
-    if (user != null) {
-      state = AuthState.authenticated(
-        user: user.copyWith(lastLoginAt: DateTime.now()),
-        token: 'dummy_token_${user.id}',
-        refreshToken: 'dummy_refresh_${user.id}',
-      );
-      return true;
-    } else {
-      state = state.copyWith(
-        status: AuthStatus.error,
-        errorMessage: 'Invalid PIN. Please try again.',
-      );
-      return false;
-    }
-  }
 
-  Future<bool> loginWithCredentials(String username, String password) async {
-    state = state.copyWith(status: AuthStatus.loading);
-    
-    await Future.delayed(const Duration(milliseconds: 500));
-    
-    final user = DummyUsers.findByCredentials(username, password);
-    
-    if (user != null) {
-      state = AuthState.authenticated(
-        user: user.copyWith(lastLoginAt: DateTime.now()),
-        token: 'dummy_token_${user.id}',
-        refreshToken: 'dummy_refresh_${user.id}',
+    try {
+      final result = await _repository.loginWithEmail(
+        email: email,
+        password: password,
       );
-      return true;
-    } else {
+
+      if (result.isSuccess) {
+        state = AuthState.authenticated(
+          user: result.user!,
+          token: result.accessToken!,
+          refreshToken: result.refreshToken!,
+        );
+        return true;
+      } else {
+        state = state.copyWith(
+          status: AuthStatus.error,
+          errorMessage:
+              result.error ?? 'Invalid credentials. Please try again.',
+        );
+        return false;
+      }
+    } catch (e) {
       state = state.copyWith(
         status: AuthStatus.error,
-        errorMessage: 'Invalid username or password.',
+        errorMessage: 'An unexpected error occurred',
       );
       return false;
     }
@@ -97,21 +111,42 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> restoreSession() async {
     state = state.copyWith(isSessionRestoring: true);
-    
-    // Simulate checking for stored session
-    await Future.delayed(const Duration(milliseconds: 300));
-    
-    // For now, just mark as unauthenticated
-    state = AuthState.unauthenticated();
+
+    try {
+      final token = await _repository.getStoredToken();
+
+      if (token != null && token.isNotEmpty) {
+        // Token exists, could fetch user profile here
+        // For now, just mark as authenticated with minimal state
+        state = state.copyWith(
+          status: AuthStatus.authenticated,
+          isSessionRestoring: false,
+        );
+      } else {
+        state = AuthState.unauthenticated();
+      }
+    } catch (e) {
+      state = AuthState.unauthenticated();
+    }
   }
 
-  void logout() {
-    state = AuthState.unauthenticated();
+  Future<void> logout() async {
+    try {
+      await _repository.logout();
+    } catch (e) {
+      // Continue with logout even if API call fails
+    } finally {
+      state = AuthState.unauthenticated();
+    }
   }
 
   void clearError() {
     if (state.hasError) {
       state = state.copyWith(status: AuthStatus.unauthenticated);
     }
+  }
+
+  void setError(String message) {
+    state = state.copyWith(status: AuthStatus.error, errorMessage: message);
   }
 }

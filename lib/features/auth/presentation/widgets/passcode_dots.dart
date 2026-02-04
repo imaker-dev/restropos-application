@@ -8,7 +8,7 @@ class PasscodeDots extends StatelessWidget {
 
   const PasscodeDots({
     super.key,
-    this.length = 6,
+    this.length = 4,
     required this.filledCount,
     this.hasError = false,
   });

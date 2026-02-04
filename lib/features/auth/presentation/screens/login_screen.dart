@@ -5,6 +5,7 @@ import '../../../../core/utils/responsive_utils.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../../domain/entities/auth_state.dart';
 import '../providers/auth_provider.dart';
+import '../providers/login_state_provider.dart';
 import '../widgets/widgets.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -15,73 +16,92 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  String _passcode = '';
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _employeeCodeController = TextEditingController();
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
     _usernameController.dispose();
     _passwordController.dispose();
+    _employeeCodeController.dispose();
     super.dispose();
   }
 
   void _onDigitPressed(String digit) {
-    if (_passcode.length < 6) {
-      setState(() {
-        _passcode += digit;
-      });
+    final currentPasscode = ref.read(passcodeProvider);
+    if (currentPasscode.length < 4) {
+      final newPasscode = currentPasscode + digit;
+      ref.read(passcodeProvider.notifier).state = newPasscode;
       ref.read(authProvider.notifier).clearError();
-      
-      // Auto-submit when 6 digits entered
-      if (_passcode.length == 6) {
-        _submitPasscode();
+
+      // Auto-submit when 4 digits entered
+      if (newPasscode.length == 4) {
+        _submitPasscode(newPasscode);
       }
     }
   }
 
   void _onBackspace() {
-    if (_passcode.isNotEmpty) {
-      setState(() {
-        _passcode = _passcode.substring(0, _passcode.length - 1);
-      });
+    final currentPasscode = ref.read(passcodeProvider);
+    if (currentPasscode.isNotEmpty) {
+      ref.read(passcodeProvider.notifier).state = currentPasscode.substring(
+        0,
+        currentPasscode.length - 1,
+      );
       ref.read(authProvider.notifier).clearError();
     }
   }
 
-  Future<void> _submitPasscode() async {
-    if (_passcode.length == 4) {
-      final success = await ref.read(authProvider.notifier).loginWithPasscode(_passcode);
+  Future<void> _submitPasscode(String passcode) async {
+    if (passcode.length == 4) {
+      final employeeCode = _employeeCodeController.text.trim();
+
+      // Validate employee code is not empty
+      if (employeeCode.isEmpty) {
+        ref.read(passcodeProvider.notifier).state = '';
+        ref
+            .read(authProvider.notifier)
+            .setError('Please enter your employee code');
+        return;
+      }
+
+      final success = await ref
+          .read(authProvider.notifier)
+          .loginWithPasscode(passcode, employeeCode: employeeCode);
       if (!success) {
-        setState(() {
-          _passcode = '';
-        });
+        ref.read(passcodeProvider.notifier).state = '';
       }
     }
   }
 
   Future<void> _submitCredentials() async {
-    if (_usernameController.text.isNotEmpty && _passwordController.text.isNotEmpty) {
-      await ref.read(authProvider.notifier).loginWithCredentials(
-        _usernameController.text,
-        _passwordController.text,
-      );
+    if (_usernameController.text.isNotEmpty &&
+        _passwordController.text.isNotEmpty) {
+      await ref
+          .read(authProvider.notifier)
+          .loginWithCredentials(
+            _usernameController.text,
+            _passwordController.text,
+          );
     }
   }
 
   void _onLoginModeChanged(LoginMode mode) {
     ref.read(authProvider.notifier).setLoginMode(mode);
-    setState(() {
-      _passcode = '';
-    });
+    ref.read(passcodeProvider.notifier).state = '';
     _usernameController.clear();
     _passwordController.clear();
+    // Don't clear employee code when switching modes - user might want to keep it
+    // _employeeCodeController.clear();
+    ref.read(authProvider.notifier).clearError();
   }
 
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
-    
+
     return Scaffold(
       backgroundColor: AppColors.scaffoldBackground,
       body: ResponsiveLayout(
@@ -222,7 +242,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  Widget _buildMobileTab(String label, IconData icon, LoginMode mode, LoginMode currentMode) {
+  Widget _buildMobileTab(
+    String label,
+    IconData icon,
+    LoginMode mode,
+    LoginMode currentMode,
+  ) {
     final isSelected = mode == currentMode;
     return InkWell(
       onTap: () => _onLoginModeChanged(mode),
@@ -274,9 +299,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Widget _buildPasscodeForm(AuthState authState) {
+    final passcode = ref.watch(passcodeProvider);
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        TextInput(
+          label: 'Employee Code',
+          hint: 'Enter your employee code (e.g., CAP0023)',
+          controller: _employeeCodeController,
+          keyboardType: TextInputType.text,
+          textInputAction: TextInputAction.done,
+          prefixIcon: const Icon(Icons.badge_outlined),
+          onChanged: (_) {
+            // Clear error when user starts typing
+            if (ref.read(authProvider).hasError) {
+              ref.read(authProvider.notifier).clearError();
+            }
+          },
+        ),
+        const SizedBox(height: AppSpacing.lg),
         const Text(
           'Enter the Passcode to access this Billing Station',
           style: TextStyle(
@@ -288,24 +330,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
         const SizedBox(height: AppSpacing.xxl),
         PasscodeDots(
-          filledCount: _passcode.length,
+          filledCount: passcode.length,
           hasError: authState.hasError,
         ),
         if (authState.hasError) ...[
           const SizedBox(height: AppSpacing.md),
           Text(
             authState.errorMessage ?? 'Invalid passcode',
-            style: const TextStyle(
-              color: AppColors.error,
-              fontSize: 14,
-            ),
+            style: const TextStyle(color: AppColors.error, fontSize: 14),
           ),
         ],
         const SizedBox(height: AppSpacing.xxl),
         PasscodeKeypad(
           onDigitPressed: _onDigitPressed,
           onBackspace: _onBackspace,
-          onSubmit: _submitPasscode,
+          onSubmit: () => _submitPasscode(passcode),
           isLoading: authState.isLoading,
         ),
         if (authState.isLoading) ...[
@@ -332,28 +371,47 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
         const SizedBox(height: AppSpacing.xxl),
         TextInput(
-          label: 'Username',
-          hint: 'Enter your username',
+          label: 'Employee Code',
+          hint: 'Enter your employee code',
+          controller: _employeeCodeController,
+          keyboardType: TextInputType.text,
+          prefixIcon: const Icon(Icons.badge_outlined),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        TextInput(
+          label: 'Email',
+          hint: 'Enter your email',
           controller: _usernameController,
-          prefixIcon: const Icon(Icons.person_outline),
+          keyboardType: TextInputType.emailAddress,
+          prefixIcon: const Icon(Icons.email_outlined),
         ),
         const SizedBox(height: AppSpacing.md),
         TextInput(
           label: 'Password',
           hint: 'Enter your password',
           controller: _passwordController,
-          obscureText: true,
+          obscureText: _obscurePassword,
           prefixIcon: const Icon(Icons.lock_outline),
+          suffixIcon: IconButton(
+            icon: Icon(
+              _obscurePassword
+                  ? Icons.visibility_outlined
+                  : Icons.visibility_off_outlined,
+              color: AppColors.textSecondary,
+            ),
+            onPressed: () {
+              setState(() {
+                _obscurePassword = !_obscurePassword;
+              });
+            },
+          ),
           onSubmitted: (_) => _submitCredentials(),
         ),
         if (authState.hasError) ...[
           const SizedBox(height: AppSpacing.md),
           Text(
             authState.errorMessage ?? 'Invalid credentials',
-            style: const TextStyle(
-              color: AppColors.error,
-              fontSize: 14,
-            ),
+            style: const TextStyle(color: AppColors.error, fontSize: 14),
             textAlign: TextAlign.center,
           ),
         ],
@@ -377,11 +435,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(
-          Icons.credit_card,
-          size: 80,
-          color: AppColors.textHint,
-        ),
+        Icon(Icons.credit_card, size: 80, color: AppColors.textHint),
         const SizedBox(height: AppSpacing.lg),
         const Text(
           'Swipe your card to login',
@@ -394,10 +448,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         const SizedBox(height: AppSpacing.sm),
         const Text(
           'Card swipe functionality coming soon',
-          style: TextStyle(
-            fontSize: 14,
-            color: AppColors.textSecondary,
-          ),
+          style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
         ),
       ],
     );
@@ -412,11 +463,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         borderRadius: AppSpacing.borderRadiusLg,
       ),
       child: Center(
-        child: Icon(
-          Icons.point_of_sale,
-          size: 100,
-          color: AppColors.textHint,
-        ),
+        child: Icon(Icons.point_of_sale, size: 100, color: AppColors.textHint),
       ),
     );
   }

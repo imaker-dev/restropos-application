@@ -25,4 +25,7 @@ class AppConstants {
   // Pagination
   static const int defaultPageSize = 20;
   static const int maxPageSize = 100;
+
+  // Outlet Configuration
+  static const int defaultOutletId = 4;
 }
