@@ -1,24 +1,28 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
-import '../../../menu/domain/entities/menu_item.dart';
+import '../../../menu/data/models/menu_models.dart';
 import '../../domain/entities/entities.dart';
 
 const _uuid = Uuid();
 
 // Current order provider (for the active table)
-final currentOrderProvider = StateNotifierProvider<CurrentOrderNotifier, Order?>((ref) {
-  return CurrentOrderNotifier();
-});
+final currentOrderProvider =
+    StateNotifierProvider<CurrentOrderNotifier, Order?>((ref) {
+      return CurrentOrderNotifier();
+    });
 
 // All orders provider
-final ordersProvider = StateNotifierProvider<OrdersNotifier, Map<String, Order>>((ref) {
-  return OrdersNotifier();
-});
+final ordersProvider =
+    StateNotifierProvider<OrdersNotifier, Map<String, Order>>((ref) {
+      return OrdersNotifier();
+    });
 
 // Order by table ID
 final orderByTableProvider = Provider.family<Order?, String>((ref, tableId) {
   final orders = ref.watch(ordersProvider);
-  return orders.values.where((o) => o.tableId == tableId && o.isActive).firstOrNull;
+  return orders.values
+      .where((o) => o.tableId == tableId && o.isActive)
+      .firstOrNull;
 });
 
 // KOTs provider
@@ -60,19 +64,37 @@ class CurrentOrderNotifier extends StateNotifier<Order?> {
     state = order;
   }
 
-  void addItem(MenuItem menuItem, {
-    MenuItemVariant? variant,
-    List<MenuItemAddon>? addons,
+  void addItem(
+    ApiMenuItem menuItem, {
+    ApiItemVariant? variant,
+    List<ApiItemAddon>? addons,
     int quantity = 1,
   }) {
     if (state == null) return;
 
-    final orderItem = OrderItem.fromMenuItem(
-      menuItem,
+    final now = DateTime.now();
+    final orderItem = OrderItem(
       id: _uuid.v4(),
-      variant: variant,
-      selectedAddons: addons,
+      menuItemId: menuItem.id.toString(),
+      name: menuItem.name,
       quantity: quantity,
+      unitPrice: variant?.price ?? menuItem.price,
+      variantId: variant?.id.toString(),
+      variantName: variant?.name,
+      addons:
+          addons
+              ?.map(
+                (a) => SelectedAddon(
+                  id: a.id.toString(),
+                  name: a.name,
+                  price: a.price,
+                ),
+              )
+              .toList() ??
+          [],
+      status: OrderItemStatus.pending,
+      createdAt: now,
+      updatedAt: now,
     );
 
     final updatedItems = [...state!.items, orderItem];
@@ -128,10 +150,7 @@ class CurrentOrderNotifier extends StateNotifier<Order?> {
     state = state!.recalculate(discount: amount);
   }
 
-  void updateCustomerDetails({
-    String? name,
-    String? phone,
-  }) {
+  void updateCustomerDetails({String? name, String? phone}) {
     if (state == null) return;
     state = state!.copyWith(
       customerName: name,
@@ -142,18 +161,12 @@ class CurrentOrderNotifier extends StateNotifier<Order?> {
 
   void updateNotes(String? notes) {
     if (state == null) return;
-    state = state!.copyWith(
-      notes: notes,
-      updatedAt: DateTime.now(),
-    );
+    state = state!.copyWith(notes: notes, updatedAt: DateTime.now());
   }
 
   void updateGuestCount(int count) {
     if (state == null) return;
-    state = state!.copyWith(
-      guestCount: count,
-      updatedAt: DateTime.now(),
-    );
+    state = state!.copyWith(guestCount: count, updatedAt: DateTime.now());
   }
 
   void clear() {
@@ -236,7 +249,9 @@ class KotsNotifier extends StateNotifier<List<Kot>> {
       if (kot.id == kotId) {
         return kot.copyWith(
           status: status,
-          printedAt: status == KotStatus.printed ? DateTime.now() : kot.printedAt,
+          printedAt: status == KotStatus.printed
+              ? DateTime.now()
+              : kot.printedAt,
         );
       }
       return kot;

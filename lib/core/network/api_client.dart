@@ -1,12 +1,22 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:restro/core/network/api_endpoints.dart';
 import '../constants/app_constants.dart';
+
+// Token storage key
+const _tokenKey = 'access_token';
+final _secureStorage = FlutterSecureStorage();
+
+// Token provider that reads from secure storage
+final storedTokenProvider = FutureProvider<String?>((ref) async {
+  return await _secureStorage.read(key: _tokenKey);
+});
 
 final dioProvider = Provider<Dio>((ref) {
   final dio = Dio(
     BaseOptions(
-      baseUrl: ApiEndPoints.baseUrl,
+      baseUrl: ApiEndpoints.baseUrl,
       connectTimeout: AppConstants.connectionTimeout,
       receiveTimeout: AppConstants.receiveTimeout,
       headers: {
@@ -17,12 +27,8 @@ final dioProvider = Provider<Dio>((ref) {
   );
 
   dio.interceptors.addAll([
-    LogInterceptor(
-      requestBody: true,
-      responseBody: true,
-      error: true,
-    ),
-    AuthInterceptor(ref),
+    LogInterceptor(requestBody: true, responseBody: true, error: true),
+    AuthInterceptor(),
     RetryInterceptor(dio),
   ]);
 
@@ -30,24 +36,36 @@ final dioProvider = Provider<Dio>((ref) {
 });
 
 class AuthInterceptor extends Interceptor {
-  final Ref ref;
-
-  AuthInterceptor(this.ref);
+  AuthInterceptor();
 
   @override
-  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    // Add auth token from provider when available
-    // final token = ref.read(authTokenProvider);
-    // if (token != null) {
-    //   options.headers['Authorization'] = 'Bearer $token';
-    // }
+  void onRequest(
+    RequestOptions options,
+    RequestInterceptorHandler handler,
+  ) async {
+    // Skip auth header for login endpoints
+    if (options.path.contains('/auth/login')) {
+      handler.next(options);
+      return;
+    }
+
+    // Add auth token from secure storage
+    try {
+      final token = await _secureStorage.read(key: _tokenKey);
+      if (token != null && token.isNotEmpty) {
+        options.headers['Authorization'] = 'Bearer $token';
+      }
+    } catch (e) {
+      // Continue without token if storage fails
+    }
     handler.next(options);
   }
 
   @override
-  void onError(DioException err, ErrorInterceptorHandler handler) {
+  void onError(DioException err, ErrorInterceptorHandler handler) async {
     if (err.response?.statusCode == 401) {
-      // Handle token refresh or logout
+      // Clear token on 401 - session expired
+      await _secureStorage.delete(key: _tokenKey);
     }
     handler.next(err);
   }
@@ -67,10 +85,12 @@ class RetryInterceptor extends Interceptor {
 
       if (retryCount < maxRetries) {
         options.extra['retryCount'] = retryCount + 1;
-        
+
         // Exponential backoff
-        await Future.delayed(Duration(milliseconds: 100 * ((retryCount as int) + 1)));
-        
+        await Future.delayed(
+          Duration(milliseconds: 100 * ((retryCount as int) + 1)),
+        );
+
         try {
           final response = await dio.fetch(options);
           handler.resolve(response);
@@ -95,11 +115,7 @@ class ApiException implements Exception {
   final int? statusCode;
   final dynamic data;
 
-  ApiException({
-    required this.message,
-    this.statusCode,
-    this.data,
-  });
+  ApiException({required this.message, this.statusCode, this.data});
 
   @override
   String toString() => 'ApiException: $message (Status: $statusCode)';
@@ -119,11 +135,7 @@ class ApiResponse<T> {
   });
 
   factory ApiResponse.success(T data, {String? message}) {
-    return ApiResponse(
-      success: true,
-      data: data,
-      message: message,
-    );
+    return ApiResponse(success: true, data: data, message: message);
   }
 
   factory ApiResponse.error(String message, {int? statusCode}) {

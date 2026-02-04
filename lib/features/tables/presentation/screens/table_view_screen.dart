@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/constants.dart';
 import '../../../../core/utils/responsive_utils.dart';
 import '../../../../shared/widgets/widgets.dart';
+import '../../../layout/data/models/layout_models.dart';
 import '../../domain/entities/table_entity.dart';
 import '../providers/tables_provider.dart';
 import '../widgets/widgets.dart';
@@ -11,10 +12,7 @@ import '../widgets/widgets.dart';
 class TableViewScreen extends ConsumerWidget {
   final VoidCallback? onTableSelected;
 
-  const TableViewScreen({
-    super.key,
-    this.onTableSelected,
-  });
+  const TableViewScreen({super.key, this.onTableSelected});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -35,9 +33,12 @@ class TableViewScreen extends ConsumerWidget {
             // Table grid
             Expanded(
               child: isLoading
-                  ? const Center(child: LoadingIndicator(size: LoadingSize.large))
+                  ? const Center(
+                      child: LoadingIndicator(size: LoadingSize.large),
+                    )
                   : RefreshIndicator(
-                      onRefresh: () => ref.read(tablesProvider.notifier).refresh(),
+                      onRefresh: () =>
+                          ref.read(tablesProvider.notifier).refresh(),
                       child: CustomScrollView(
                         slivers: [
                           for (final entry in tablesGrouped.entries) ...[
@@ -52,24 +53,33 @@ class TableViewScreen extends ConsumerWidget {
                                 horizontal: AppSpacing.sm,
                               ),
                               sliver: SliverGrid(
-                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: _getCrossAxisCount(deviceType),
-                                  crossAxisSpacing: AppSpacing.xs,
-                                  mainAxisSpacing: AppSpacing.xs,
-                                  childAspectRatio: 1,
-                                ),
-                                delegate: SliverChildBuilderDelegate(
-                                  (context, index) {
-                                    final table = entry.value[index];
-                                    return TableCard(
-                                      table: table,
-                                      isSelected: table.id == selectedTableId,
-                                      onTap: () => _onTableTap(context, ref, table, deviceType),
-                                      onLongPress: () => _onTableLongPress(context, ref, table),
-                                    );
-                                  },
-                                  childCount: entry.value.length,
-                                ),
+                                gridDelegate:
+                                    SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: _getCrossAxisCount(
+                                        deviceType,
+                                      ),
+                                      crossAxisSpacing: AppSpacing.xs,
+                                      mainAxisSpacing: AppSpacing.xs,
+                                      childAspectRatio: 1,
+                                    ),
+                                delegate: SliverChildBuilderDelegate((
+                                  context,
+                                  index,
+                                ) {
+                                  final table = entry.value[index];
+                                  return TableCard(
+                                    table: table,
+                                    isSelected: table.id == selectedTableId,
+                                    onTap: () => _onTableTap(
+                                      context,
+                                      ref,
+                                      table,
+                                      deviceType,
+                                    ),
+                                    onLongPress: () =>
+                                        _onTableLongPress(context, ref, table),
+                                  );
+                                }, childCount: entry.value.length),
                               ),
                             ),
                           ],
@@ -93,7 +103,9 @@ class TableViewScreen extends ConsumerWidget {
     DeviceType deviceType,
   ) {
     final isMobile = deviceType.isMobile;
-    
+    final floorsAsync = ref.watch(floorsProvider);
+    final selectedFloorId = ref.watch(selectedFloorProvider);
+
     return Container(
       color: AppColors.surface,
       padding: EdgeInsets.symmetric(
@@ -102,13 +114,74 @@ class TableViewScreen extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          // Title
-          Text(
-            'Table View',
-            style: TextStyle(
-              fontSize: isMobile ? 16 : 18,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+          // Floor Dropdown
+          floorsAsync.when(
+            data: (floors) {
+              if (floors.isEmpty) {
+                return Text(
+                  'Table View',
+                  style: TextStyle(
+                    fontSize: isMobile ? 16 : 18,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                );
+              }
+
+              // If multiple floors, show dropdown
+              if (floors.length > 1) {
+                // Auto-load first floor if none selected
+                if (selectedFloorId == null) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    ref.read(selectedFloorProvider.notifier).state =
+                        floors.first.id;
+                    ref
+                        .read(tablesProvider.notifier)
+                        .loadTablesByFloorDetails(floors.first.id);
+                  });
+                }
+                return _FloorDropdown(
+                  floors: floors,
+                  selectedFloorId: selectedFloorId ?? floors.first.id,
+                  onChanged: (floorId) {
+                    ref.read(selectedFloorProvider.notifier).state = floorId;
+                    if (floorId != null) {
+                      ref
+                          .read(tablesProvider.notifier)
+                          .loadTablesByFloorDetails(floorId);
+                    }
+                  },
+                );
+              }
+
+              // Single floor - auto-load tables and show name
+              if (selectedFloorId == null) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  ref.read(selectedFloorProvider.notifier).state =
+                      floors.first.id;
+                  ref
+                      .read(tablesProvider.notifier)
+                      .loadTablesByFloorDetails(floors.first.id);
+                });
+              }
+              return Text(
+                floors.first.name,
+                style: TextStyle(
+                  fontSize: isMobile ? 16 : 18,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              );
+            },
+            loading: () =>
+                const SizedBox(width: 100, child: LinearProgressIndicator()),
+            error: (_, __) => Text(
+              'Table View',
+              style: TextStyle(
+                fontSize: isMobile ? 16 : 18,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
             ),
           ),
           const Spacer(),
@@ -142,7 +215,7 @@ class TableViewScreen extends ConsumerWidget {
     DeviceType deviceType,
   ) {
     final selectedStatus = ref.watch(selectedStatusFilterProvider);
-    
+
     return Container(
       color: AppColors.scaffoldBackground,
       padding: const EdgeInsets.symmetric(
@@ -159,7 +232,8 @@ class TableViewScreen extends ConsumerWidget {
               label: 'All',
               count: counts.values.fold(0, (a, b) => a + b),
               isSelected: selectedStatus == null,
-              onTap: () => ref.read(selectedStatusFilterProvider.notifier).state = null,
+              onTap: () =>
+                  ref.read(selectedStatusFilterProvider.notifier).state = null,
             ),
             const SizedBox(width: AppSpacing.sm),
             _StatusDot(
@@ -167,7 +241,9 @@ class TableViewScreen extends ConsumerWidget {
               label: 'Blank',
               count: counts[TableStatus.blank] ?? 0,
               isSelected: selectedStatus == TableStatus.blank,
-              onTap: () => ref.read(selectedStatusFilterProvider.notifier).state = TableStatus.blank,
+              onTap: () =>
+                  ref.read(selectedStatusFilterProvider.notifier).state =
+                      TableStatus.blank,
             ),
             const SizedBox(width: AppSpacing.sm),
             _StatusDot(
@@ -175,7 +251,9 @@ class TableViewScreen extends ConsumerWidget {
               label: 'Running',
               count: counts[TableStatus.running] ?? 0,
               isSelected: selectedStatus == TableStatus.running,
-              onTap: () => ref.read(selectedStatusFilterProvider.notifier).state = TableStatus.running,
+              onTap: () =>
+                  ref.read(selectedStatusFilterProvider.notifier).state =
+                      TableStatus.running,
             ),
             const SizedBox(width: AppSpacing.sm),
             _StatusDot(
@@ -183,7 +261,9 @@ class TableViewScreen extends ConsumerWidget {
               label: 'KOT',
               count: counts[TableStatus.runningKot] ?? 0,
               isSelected: selectedStatus == TableStatus.runningKot,
-              onTap: () => ref.read(selectedStatusFilterProvider.notifier).state = TableStatus.runningKot,
+              onTap: () =>
+                  ref.read(selectedStatusFilterProvider.notifier).state =
+                      TableStatus.runningKot,
             ),
             const SizedBox(width: AppSpacing.sm),
             _StatusDot(
@@ -191,7 +271,9 @@ class TableViewScreen extends ConsumerWidget {
               label: 'Printed',
               count: counts[TableStatus.printed] ?? 0,
               isSelected: selectedStatus == TableStatus.printed,
-              onTap: () => ref.read(selectedStatusFilterProvider.notifier).state = TableStatus.printed,
+              onTap: () =>
+                  ref.read(selectedStatusFilterProvider.notifier).state =
+                      TableStatus.printed,
             ),
             const SizedBox(width: AppSpacing.sm),
             _StatusDot(
@@ -199,7 +281,9 @@ class TableViewScreen extends ConsumerWidget {
               label: 'Paid',
               count: counts[TableStatus.paid] ?? 0,
               isSelected: selectedStatus == TableStatus.paid,
-              onTap: () => ref.read(selectedStatusFilterProvider.notifier).state = TableStatus.paid,
+              onTap: () =>
+                  ref.read(selectedStatusFilterProvider.notifier).state =
+                      TableStatus.paid,
             ),
           ],
         ),
@@ -218,10 +302,15 @@ class TableViewScreen extends ConsumerWidget {
     }
   }
 
-  void _onTableTap(BuildContext context, WidgetRef ref, RestaurantTable table, DeviceType deviceType) {
+  void _onTableTap(
+    BuildContext context,
+    WidgetRef ref,
+    RestaurantTable table,
+    DeviceType deviceType,
+  ) {
     HapticFeedback.selectionClick();
     ref.read(selectedTableProvider.notifier).state = table.id;
-    
+
     if (table.status == TableStatus.blank) {
       // For blank table, show quick open dialog
       _showOpenTableDialog(context, ref, table);
@@ -235,12 +324,20 @@ class TableViewScreen extends ConsumerWidget {
     }
   }
 
-  void _onTableLongPress(BuildContext context, WidgetRef ref, RestaurantTable table) {
+  void _onTableLongPress(
+    BuildContext context,
+    WidgetRef ref,
+    RestaurantTable table,
+  ) {
     HapticFeedback.mediumImpact();
     _showTableOptionsSheet(context, ref, table);
   }
 
-  void _showOpenTableDialog(BuildContext context, WidgetRef ref, RestaurantTable table) {
+  void _showOpenTableDialog(
+    BuildContext context,
+    WidgetRef ref,
+    RestaurantTable table,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -248,7 +345,9 @@ class TableViewScreen extends ConsumerWidget {
       builder: (context) => _QuickOpenTableSheet(
         table: table,
         onConfirm: (guestCount) {
-          ref.read(tablesProvider.notifier).openTable(table.id, guestCount: guestCount);
+          ref
+              .read(tablesProvider.notifier)
+              .openTable(table.id, guestCount: guestCount);
           Navigator.of(context).pop();
           onTableSelected?.call();
         },
@@ -256,7 +355,11 @@ class TableViewScreen extends ConsumerWidget {
     );
   }
 
-  void _showTableOrderSheet(BuildContext context, WidgetRef ref, RestaurantTable table) {
+  void _showTableOrderSheet(
+    BuildContext context,
+    WidgetRef ref,
+    RestaurantTable table,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -275,7 +378,11 @@ class TableViewScreen extends ConsumerWidget {
     );
   }
 
-  void _showTableOptionsSheet(BuildContext context, WidgetRef ref, RestaurantTable table) {
+  void _showTableOptionsSheet(
+    BuildContext context,
+    WidgetRef ref,
+    RestaurantTable table,
+  ) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -323,10 +430,7 @@ class _OpenTableDialog extends StatefulWidget {
   final RestaurantTable table;
   final ValueChanged<int> onConfirm;
 
-  const _OpenTableDialog({
-    required this.table,
-    required this.onConfirm,
-  });
+  const _OpenTableDialog({required this.table, required this.onConfirm});
 
   @override
   State<_OpenTableDialog> createState() => _OpenTableDialogState();
@@ -406,10 +510,7 @@ class _TableOptionsSheet extends StatelessWidget {
   final RestaurantTable table;
   final ValueChanged<String> onAction;
 
-  const _TableOptionsSheet({
-    required this.table,
-    required this.onAction,
-  });
+  const _TableOptionsSheet({required this.table, required this.onAction});
 
   @override
   Widget build(BuildContext context) {
@@ -421,18 +522,13 @@ class _TableOptionsSheet extends StatelessWidget {
         children: [
           Text(
             'Table ${table.name}',
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
             'Status: ${table.status.displayName}',
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-            ),
+            style: const TextStyle(color: AppColors.textSecondary),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: AppSpacing.lg),
@@ -461,13 +557,97 @@ class _TableOptionsSheet extends StatelessWidget {
             const Divider(),
             ListTile(
               leading: const Icon(Icons.close, color: AppColors.error),
-              title: const Text('Close Table', style: TextStyle(color: AppColors.error)),
+              title: const Text(
+                'Close Table',
+                style: TextStyle(color: AppColors.error),
+              ),
               onTap: () => onAction('close'),
             ),
           ],
           const SizedBox(height: AppSpacing.md),
         ],
       ),
+    );
+  }
+}
+
+// Floor dropdown selector for captains with multiple floors
+class _FloorDropdown extends StatelessWidget {
+  final List<Floor> floors;
+  final int? selectedFloorId;
+  final ValueChanged<int?> onChanged;
+
+  const _FloorDropdown({
+    required this.floors,
+    required this.selectedFloorId,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedFloor = selectedFloorId != null
+        ? floors.firstWhere(
+            (f) => f.id == selectedFloorId,
+            orElse: () => floors.first,
+          )
+        : floors.first;
+
+    return PopupMenuButton<int>(
+      onSelected: onChanged,
+      offset: const Offset(0, 40),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.layers, size: 18, color: AppColors.primary),
+            const SizedBox(width: 8),
+            Text(
+              selectedFloor.name,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(
+              Icons.arrow_drop_down,
+              size: 20,
+              color: AppColors.primary,
+            ),
+          ],
+        ),
+      ),
+      itemBuilder: (context) => floors.map((floor) {
+        final isSelected = floor.id == (selectedFloorId ?? floors.first.id);
+        return PopupMenuItem<int>(
+          value: floor.id,
+          child: Row(
+            children: [
+              Icon(
+                isSelected ? Icons.check_circle : Icons.radio_button_unchecked,
+                size: 18,
+                color: isSelected ? AppColors.primary : AppColors.textSecondary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                floor.name,
+                style: TextStyle(
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 }
@@ -531,7 +711,9 @@ class _StatusDot extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: isSelected ? color.withValues(alpha: 0.15) : Colors.transparent,
+          color: isSelected
+              ? color.withValues(alpha: 0.15)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: isSelected ? Border.all(color: color, width: 1.5) : null,
         ),
@@ -567,10 +749,7 @@ class _QuickOpenTableSheet extends StatefulWidget {
   final RestaurantTable table;
   final ValueChanged<int> onConfirm;
 
-  const _QuickOpenTableSheet({
-    required this.table,
-    required this.onConfirm,
-  });
+  const _QuickOpenTableSheet({required this.table, required this.onConfirm});
 
   @override
   State<_QuickOpenTableSheet> createState() => _QuickOpenTableSheetState();
@@ -603,10 +782,7 @@ class _QuickOpenTableSheetState extends State<_QuickOpenTableSheet> {
           // Table name
           Text(
             'Open Table ${widget.table.name}',
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
@@ -620,10 +796,7 @@ class _QuickOpenTableSheetState extends State<_QuickOpenTableSheet> {
           // Guest count selector - Large buttons for easy tap
           const Text(
             'Number of Guests',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 12),
           Row(
@@ -631,7 +804,9 @@ class _QuickOpenTableSheetState extends State<_QuickOpenTableSheet> {
             children: [
               _GuestCountButton(
                 icon: Icons.remove,
-                onTap: _guestCount > 1 ? () => setState(() => _guestCount--) : null,
+                onTap: _guestCount > 1
+                    ? () => setState(() => _guestCount--)
+                    : null,
               ),
               Container(
                 width: 80,
@@ -665,7 +840,9 @@ class _QuickOpenTableSheetState extends State<_QuickOpenTableSheet> {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primary : AppColors.scaffoldBackground,
+                    color: isSelected
+                        ? AppColors.primary
+                        : AppColors.scaffoldBackground,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: isSelected ? AppColors.primary : AppColors.border,
@@ -677,7 +854,9 @@ class _QuickOpenTableSheetState extends State<_QuickOpenTableSheet> {
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
-                        color: isSelected ? Colors.white : AppColors.textPrimary,
+                        color: isSelected
+                            ? Colors.white
+                            : AppColors.textPrimary,
                       ),
                     ),
                   ),
@@ -701,10 +880,7 @@ class _QuickOpenTableSheetState extends State<_QuickOpenTableSheet> {
               ),
               child: const Text(
                 'START TABLE',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
           ),
@@ -719,10 +895,7 @@ class _GuestCountButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onTap;
 
-  const _GuestCountButton({
-    required this.icon,
-    this.onTap,
-  });
+  const _GuestCountButton({required this.icon, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -767,7 +940,10 @@ class _TableOrderDetailsSheet extends StatelessWidget {
       {'name': 'Dal Makhani', 'qty': 1, 'price': 220},
       {'name': 'Chai', 'qty': 2, 'price': 60},
     ];
-    final subtotal = dummyItems.fold<int>(0, (sum, item) => sum + (item['price'] as int));
+    final subtotal = dummyItems.fold<int>(
+      0,
+      (sum, item) => sum + (item['price'] as int),
+    );
 
     return Container(
       decoration: const BoxDecoration(
@@ -796,7 +972,10 @@ class _TableOrderDetailsSheet extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: table.status.color,
                     borderRadius: BorderRadius.circular(6),
@@ -892,7 +1071,12 @@ class _TableOrderDetailsSheet extends StatelessWidget {
           ),
           // Action buttons
           Padding(
-            padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.of(context).padding.bottom + 16),
+            padding: EdgeInsets.fromLTRB(
+              16,
+              8,
+              16,
+              MediaQuery.of(context).padding.bottom + 16,
+            ),
             child: Row(
               children: [
                 Expanded(
@@ -901,7 +1085,10 @@ class _TableOrderDetailsSheet extends StatelessWidget {
                     child: ElevatedButton.icon(
                       onPressed: onAddItems,
                       icon: const Icon(Icons.add),
-                      label: const Text('ADD ITEMS', style: TextStyle(fontWeight: FontWeight.bold)),
+                      label: const Text(
+                        'ADD ITEMS',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
@@ -919,10 +1106,16 @@ class _TableOrderDetailsSheet extends StatelessWidget {
                     child: OutlinedButton.icon(
                       onPressed: onViewBill,
                       icon: const Icon(Icons.receipt_long),
-                      label: const Text('VIEW BILL', style: TextStyle(fontWeight: FontWeight.bold)),
+                      label: const Text(
+                        'VIEW BILL',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.secondary,
-                        side: const BorderSide(color: AppColors.secondary, width: 2),
+                        side: const BorderSide(
+                          color: AppColors.secondary,
+                          width: 2,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),

@@ -4,8 +4,10 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/constants.dart';
 import '../../core/providers/connectivity_provider.dart';
 import '../../core/utils/responsive_utils.dart';
-import '../../features/auth/auth.dart';
-import '../../features/menu/menu.dart';
+import '../../features/auth/data/models/auth_models.dart';
+import '../../features/auth/presentation/providers/auth_provider.dart';
+import '../../features/menu/data/models/menu_models.dart';
+import '../../features/menu/menu.dart' hide MenuItemType;
 import '../../features/tables/tables.dart';
 
 class CaptainHomeScreen extends ConsumerStatefulWidget {
@@ -38,7 +40,7 @@ class _CaptainHomeScreenState extends ConsumerState<CaptainHomeScreen> {
     );
   }
 
-  Widget _buildDesktopLayout(User? user) {
+  Widget _buildDesktopLayout(ApiUser? user) {
     return Scaffold(
       body: Row(
         children: [
@@ -46,15 +48,13 @@ class _CaptainHomeScreenState extends ConsumerState<CaptainHomeScreen> {
           _buildDesktopNavRail(user),
           const VerticalDivider(width: 1),
           // Main content
-          Expanded(
-            child: _buildContent(),
-          ),
+          Expanded(child: _buildContent()),
         ],
       ),
     );
   }
 
-  Widget _buildTabletLayout(User? user) {
+  Widget _buildTabletLayout(ApiUser? user) {
     return Scaffold(
       body: Row(
         children: [
@@ -62,18 +62,16 @@ class _CaptainHomeScreenState extends ConsumerState<CaptainHomeScreen> {
           _buildTabletNavRail(user),
           const VerticalDivider(width: 1),
           // Main content
-          Expanded(
-            child: _buildContent(),
-          ),
+          Expanded(child: _buildContent()),
         ],
       ),
     );
   }
 
-  Widget _buildMobileLayout(User? user) {
+  Widget _buildMobileLayout(ApiUser? user) {
     // Clamp selected index for mobile (only 5 items in bottom nav)
     final mobileIndex = _selectedIndex.clamp(0, 4);
-    
+
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 48,
@@ -109,16 +107,18 @@ class _CaptainHomeScreenState extends ConsumerState<CaptainHomeScreen> {
         iconSize: 22,
         items: _navItems
             .take(5)
-            .map((item) => BottomNavigationBarItem(
-                  icon: Icon(item.icon),
-                  label: item.label,
-                ))
+            .map(
+              (item) => BottomNavigationBarItem(
+                icon: Icon(item.icon),
+                label: item.label,
+              ),
+            )
             .toList(),
       ),
     );
   }
 
-  Widget _buildDesktopNavRail(User? user) {
+  Widget _buildDesktopNavRail(ApiUser? user) {
     return Container(
       width: 200,
       color: AppColors.surface,
@@ -136,18 +136,12 @@ class _CaptainHomeScreenState extends ConsumerState<CaptainHomeScreen> {
                     color: AppColors.primary,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(
-                    Icons.restaurant,
-                    color: Colors.white,
-                  ),
+                  child: const Icon(Icons.restaurant, color: Colors.white),
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 const Text(
                   'RestroPOS',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -184,7 +178,9 @@ class _CaptainHomeScreenState extends ConsumerState<CaptainHomeScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
-                          user.role.displayName,
+                          user.roles.isNotEmpty
+                              ? user.roles.first.name ?? 'Captain'
+                              : 'Captain',
                           style: const TextStyle(
                             fontSize: 11,
                             color: AppColors.textSecondary,
@@ -233,7 +229,7 @@ class _CaptainHomeScreenState extends ConsumerState<CaptainHomeScreen> {
     );
   }
 
-  Widget _buildTabletNavRail(User? user) {
+  Widget _buildTabletNavRail(ApiUser? user) {
     return Container(
       width: 72,
       color: AppColors.surface,
@@ -251,11 +247,7 @@ class _CaptainHomeScreenState extends ConsumerState<CaptainHomeScreen> {
               color: AppColors.primary,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(
-              Icons.restaurant,
-              color: Colors.white,
-              size: 20,
-            ),
+            child: const Icon(Icons.restaurant, color: Colors.white, size: 20),
           ),
           const SizedBox(height: AppSpacing.sm),
           const Divider(),
@@ -292,9 +284,7 @@ class _CaptainHomeScreenState extends ConsumerState<CaptainHomeScreen> {
   Widget _buildContent() {
     switch (_selectedIndex) {
       case 0:
-        return TableViewScreen(
-          onTableSelected: _navigateToOrder,
-        );
+        return TableViewScreen(onTableSelected: _navigateToOrder);
       case 1:
         return _buildOrdersView();
       case 2:
@@ -306,9 +296,7 @@ class _CaptainHomeScreenState extends ConsumerState<CaptainHomeScreen> {
       case 5:
         return _buildHistoryView();
       default:
-        return TableViewScreen(
-          onTableSelected: _navigateToOrder,
-        );
+        return TableViewScreen(onTableSelected: _navigateToOrder);
     }
   }
 
@@ -377,16 +365,13 @@ class _CaptainHomeScreenState extends ConsumerState<CaptainHomeScreen> {
             const SizedBox(height: AppSpacing.sm),
             Text(
               user?.name ?? 'User',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             Text(
-              user?.role.displayName ?? '',
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-              ),
+              user?.roles.isNotEmpty == true
+                  ? (user!.roles.first.name ?? 'Captain')
+                  : 'Captain',
+              style: const TextStyle(color: AppColors.textSecondary),
             ),
             const SizedBox(height: AppSpacing.lg),
             ListTile(
@@ -432,7 +417,9 @@ class _DesktopNavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: isSelected ? AppColors.primary.withValues(alpha: 0.1) : Colors.transparent,
+      color: isSelected
+          ? AppColors.primary.withValues(alpha: 0.1)
+          : Colors.transparent,
       child: InkWell(
         onTap: onTap,
         child: Container(
@@ -480,7 +467,9 @@ class _TabletNavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: isSelected ? AppColors.primary.withValues(alpha: 0.1) : Colors.transparent,
+      color: isSelected
+          ? AppColors.primary.withValues(alpha: 0.1)
+          : Colors.transparent,
       child: InkWell(
         onTap: onTap,
         child: Container(
@@ -499,7 +488,9 @@ class _TabletNavItem extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                  color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                  color: isSelected
+                      ? AppColors.primary
+                      : AppColors.textSecondary,
                 ),
               ),
             ],
@@ -515,15 +506,12 @@ class _OrdersListView extends ConsumerWidget {
   final String? filterType;
   final Function(String tableId) onOrderTap;
 
-  const _OrdersListView({
-    this.filterType,
-    required this.onOrderTap,
-  });
+  const _OrdersListView({this.filterType, required this.onOrderTap});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tables = ref.watch(tablesProvider).tables;
-    
+
     // Filter tables with active orders
     final activeTables = tables.where((t) {
       if (t.status == TableStatus.blank) return false;
@@ -538,17 +526,21 @@ class _OrdersListView extends ConsumerWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              filterType == 'delivery' ? Icons.delivery_dining :
-              filterType == 'pickup' ? Icons.shopping_bag :
-              Icons.receipt_long,
+              filterType == 'delivery'
+                  ? Icons.delivery_dining
+                  : filterType == 'pickup'
+                  ? Icons.shopping_bag
+                  : Icons.receipt_long,
               size: 64,
               color: AppColors.textHint,
             ),
             const SizedBox(height: 16),
             Text(
-              filterType == 'delivery' ? 'No delivery orders' :
-              filterType == 'pickup' ? 'No pick up orders' :
-              'No active orders',
+              filterType == 'delivery'
+                  ? 'No delivery orders'
+                  : filterType == 'pickup'
+                  ? 'No pick up orders'
+                  : 'No active orders',
               style: const TextStyle(
                 fontSize: 16,
                 color: AppColors.textSecondary,
@@ -568,9 +560,11 @@ class _OrdersListView extends ConsumerWidget {
           child: Row(
             children: [
               Text(
-                filterType == 'delivery' ? 'Delivery Orders' :
-                filterType == 'pickup' ? 'Pick Up Orders' :
-                'Active Orders',
+                filterType == 'delivery'
+                    ? 'Delivery Orders'
+                    : filterType == 'pickup'
+                    ? 'Pick Up Orders'
+                    : 'Active Orders',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -579,9 +573,7 @@ class _OrdersListView extends ConsumerWidget {
               const Spacer(),
               Text(
                 '${activeTables.length} orders',
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                ),
+                style: const TextStyle(color: AppColors.textSecondary),
               ),
             ],
           ),
@@ -611,10 +603,7 @@ class _OrderCard extends StatelessWidget {
   final RestaurantTable table;
   final VoidCallback onTap;
 
-  const _OrderCard({
-    required this.table,
-    required this.onTap,
-  });
+  const _OrderCard({required this.table, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -662,7 +651,10 @@ class _OrderCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: table.status.color.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(4),
@@ -681,7 +673,11 @@ class _OrderCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        Icon(Icons.people_outline, size: 14, color: AppColors.textSecondary),
+                        Icon(
+                          Icons.people_outline,
+                          size: 14,
+                          color: AppColors.textSecondary,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           '${table.guestCount ?? 0} guests',
@@ -691,7 +687,11 @@ class _OrderCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        Icon(Icons.timer_outlined, size: 14, color: AppColors.textSecondary),
+                        Icon(
+                          Icons.timer_outlined,
+                          size: 14,
+                          color: AppColors.textSecondary,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           _getElapsedTime(table.orderStartedAt),
@@ -717,7 +717,10 @@ class _OrderCard extends StatelessWidget {
                       color: AppColors.primary,
                     ),
                   ),
-                  const Icon(Icons.chevron_right, color: AppColors.textSecondary),
+                  const Icon(
+                    Icons.chevron_right,
+                    color: AppColors.textSecondary,
+                  ),
                 ],
               ),
             ],
@@ -736,11 +739,26 @@ class _OrderCard extends StatelessWidget {
 }
 
 // Menu Management View
-class _MenuManagementView extends ConsumerWidget {
+class _MenuManagementView extends ConsumerStatefulWidget {
   const _MenuManagementView();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_MenuManagementView> createState() =>
+      _MenuManagementViewState();
+}
+
+class _MenuManagementViewState extends ConsumerState<_MenuManagementView> {
+  @override
+  void initState() {
+    super.initState();
+    // Load menu from API when view is opened
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(menuProvider.notifier).loadMenu();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final categories = ref.watch(categoriesProvider);
     final items = ref.watch(menuItemsProvider);
 
@@ -754,10 +772,7 @@ class _MenuManagementView extends ConsumerWidget {
             children: [
               const Text(
                 'Menu Items',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
               const Spacer(),
               Text(
@@ -825,7 +840,11 @@ class _MenuManagementView extends ConsumerWidget {
                             ),
                             const Spacer(),
                             if (item.hasVariants)
-                              const Icon(Icons.tune, size: 14, color: AppColors.textSecondary),
+                              const Icon(
+                                Icons.tune,
+                                size: 14,
+                                color: AppColors.textSecondary,
+                              ),
                           ],
                         ),
                         const Spacer(),
@@ -859,7 +878,7 @@ class _MenuManagementView extends ConsumerWidget {
     );
   }
 
-  void _showItemDetails(BuildContext context, MenuItem item) {
+  void _showItemDetails(BuildContext context, ApiMenuItem item) {
     showModalBottomSheet(
       context: context,
       builder: (context) => Container(
@@ -875,7 +894,9 @@ class _MenuManagementView extends ConsumerWidget {
                   height: 16,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: item.type == MenuItemType.veg ? Colors.green : Colors.red,
+                    color: item.type == MenuItemType.veg
+                        ? Colors.green
+                        : Colors.red,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -918,12 +939,18 @@ class _MenuManagementView extends ConsumerWidget {
               const SizedBox(height: 4),
               Wrap(
                 spacing: 8,
-                children: item.variants.map((v) => Chip(
-                  label: Text('${v.name} - ₹${v.price.toStringAsFixed(0)}'),
-                )).toList(),
+                children: (item.variants ?? [])
+                    .map(
+                      (v) => Chip(
+                        label: Text(
+                          '${v.name} - ₹${v.price.toStringAsFixed(0)}',
+                        ),
+                      ),
+                    )
+                    .toList(),
               ),
             ],
-            if (item.addons.isNotEmpty) ...[
+            if (item.addons?.isNotEmpty == true) ...[
               const SizedBox(height: 12),
               const Text(
                 'Add-ons:',
@@ -932,9 +959,15 @@ class _MenuManagementView extends ConsumerWidget {
               const SizedBox(height: 4),
               Wrap(
                 spacing: 8,
-                children: item.addons.map((a) => Chip(
-                  label: Text('${a.name} +₹${a.price.toStringAsFixed(0)}'),
-                )).toList(),
+                children: (item.addons ?? [])
+                    .map(
+                      (a) => Chip(
+                        label: Text(
+                          '${a.name} +₹${a.price.toStringAsFixed(0)}',
+                        ),
+                      ),
+                    )
+                    .toList(),
               ),
             ],
             const SizedBox(height: 16),
@@ -961,10 +994,7 @@ class _OrderHistoryView extends StatelessWidget {
             children: [
               Text(
                 'Order History',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
               Spacer(),
               Icon(Icons.filter_list, size: 20),
@@ -990,10 +1020,7 @@ class _OrderHistoryView extends StatelessWidget {
                 SizedBox(height: 8),
                 Text(
                   'Completed orders will appear here',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textHint,
-                  ),
+                  style: TextStyle(fontSize: 12, color: AppColors.textHint),
                 ),
               ],
             ),

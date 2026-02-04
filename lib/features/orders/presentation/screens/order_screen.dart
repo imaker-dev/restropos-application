@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/constants.dart';
 import '../../../../core/utils/responsive_utils.dart';
 import '../../../../shared/widgets/widgets.dart';
-import '../../../menu/menu.dart';
+import '../../../menu/data/models/menu_models.dart';
+import '../../../menu/menu.dart' hide MenuItemType;
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../tables/tables.dart';
 import '../providers/order_provider.dart';
@@ -12,10 +13,7 @@ import '../widgets/widgets.dart';
 class OrderScreen extends ConsumerStatefulWidget {
   final String tableId;
 
-  const OrderScreen({
-    super.key,
-    required this.tableId,
-  });
+  const OrderScreen({super.key, required this.tableId});
 
   @override
   ConsumerState<OrderScreen> createState() => _OrderScreenState();
@@ -32,6 +30,9 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
 
   void _initializeOrder() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Load menu from API
+      ref.read(menuProvider.notifier).loadMenu();
+
       final table = ref.read(tableProvider(widget.tableId));
       final user = ref.read(currentUserProvider);
       final existingOrder = ref.read(orderByTableProvider(widget.tableId));
@@ -39,13 +40,15 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
       if (existingOrder != null) {
         ref.read(currentOrderProvider.notifier).loadOrder(existingOrder);
       } else if (table != null && user != null) {
-        ref.read(currentOrderProvider.notifier).createOrder(
-          tableId: table.id,
-          tableName: table.name,
-          captainId: user.id,
-          captainName: user.name,
-          guestCount: table.guestCount ?? 1,
-        );
+        ref
+            .read(currentOrderProvider.notifier)
+            .createOrder(
+              tableId: table.id,
+              tableName: table.name,
+              captainId: user.id.toString(),
+              captainName: user.name,
+              guestCount: table.guestCount ?? 1,
+            );
       }
     });
   }
@@ -56,8 +59,9 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
     super.dispose();
   }
 
-  void _onMenuItemTap(MenuItem item) {
-    if (item.hasVariants) {
+  void _onMenuItemTap(ApiMenuItem item) {
+    // Show selector sheet if item has variants OR addons
+    if (item.hasVariants || item.hasAddons) {
       _showVariantSelector(item);
     } else {
       ref.read(currentOrderProvider.notifier).addItem(item);
@@ -65,17 +69,15 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
     }
   }
 
-  void _showVariantSelector(MenuItem item) {
+  void _showVariantSelector(ApiMenuItem item) {
     showModalBottomSheet(
       context: context,
       builder: (context) => _VariantSelectorSheet(
         item: item,
         onSelect: (variant, addons) {
-          ref.read(currentOrderProvider.notifier).addItem(
-            item,
-            variant: variant,
-            addons: addons,
-          );
+          ref
+              .read(currentOrderProvider.notifier)
+              .addItem(item, variant: variant, addons: addons);
           Navigator.pop(context);
           Toast.success(context, '${item.name} added');
         },
@@ -91,25 +93,25 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
     final pendingItems = order.pendingItems;
     if (pendingItems.isEmpty) return;
 
-    final kot = ref.read(kotsProvider.notifier).createKot(
-      orderId: order.id,
-      tableId: order.tableId,
-      tableName: order.tableName,
-      items: pendingItems,
-      captainId: user.id,
-      captainName: user.name,
-    );
+    final kot = ref
+        .read(kotsProvider.notifier)
+        .createKot(
+          orderId: order.id,
+          tableId: order.tableId,
+          tableName: order.tableName,
+          items: pendingItems,
+          captainId: user.id.toString(),
+          captainName: user.name,
+        );
 
-    ref.read(currentOrderProvider.notifier).markItemsAsKot(
-      pendingItems.map((i) => i.id).toList(),
-      kot.id,
-    );
+    ref
+        .read(currentOrderProvider.notifier)
+        .markItemsAsKot(pendingItems.map((i) => i.id).toList(), kot.id);
 
     // Update table status
-    ref.read(tablesProvider.notifier).updateTableStatus(
-      widget.tableId,
-      TableStatus.runningKot,
-    );
+    ref
+        .read(tablesProvider.notifier)
+        .updateTableStatus(widget.tableId, TableStatus.runningKot);
 
     Toast.success(context, 'KOT #${kot.kotNumber} generated');
   }
@@ -143,18 +145,22 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
                 child: Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                      icon: const Icon(
+                        Icons.arrow_back,
+                        color: Colors.white,
+                        size: 20,
+                      ),
                       onPressed: () => Navigator.pop(context),
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      constraints: const BoxConstraints(
+                        minWidth: 32,
+                        minHeight: 32,
+                      ),
                     ),
                     const Flexible(
                       child: Text(
                         'Table Started By',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 10,
-                        ),
+                        style: TextStyle(color: Colors.white70, fontSize: 10),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -167,10 +173,7 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
                 color: AppColors.secondary,
                 child: Text(
                   _formatDateTime(DateTime.now()),
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 10,
-                  ),
+                  style: const TextStyle(color: Colors.white70, fontSize: 10),
                 ),
               ),
               // Categories
@@ -194,7 +197,8 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
                         controller: _searchController,
                         hint: 'Search Item',
                         onChanged: (query) {
-                          ref.read(menuSearchQueryProvider.notifier).state = query;
+                          ref.read(menuSearchQueryProvider.notifier).state =
+                              query;
                         },
                       ),
                     ),
@@ -203,7 +207,8 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
                       child: SearchInput(
                         hint: 'Short Codes',
                         onChanged: (query) {
-                          ref.read(menuSearchQueryProvider.notifier).state = query;
+                          ref.read(menuSearchQueryProvider.notifier).state =
+                              query;
                         },
                       ),
                     ),
@@ -211,9 +216,7 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
                 ),
               ),
               // Menu items grid
-              Expanded(
-                child: _buildMenuGrid(),
-              ),
+              Expanded(child: _buildMenuGrid()),
             ],
           ),
         ),
@@ -310,9 +313,16 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
             const SizedBox(width: 6),
             Text(
               '${table?.guestCount ?? 0}',
-              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
             ),
-            const Icon(Icons.people_outline, size: 14, color: AppColors.textSecondary),
+            const Icon(
+              Icons.people_outline,
+              size: 14,
+              color: AppColors.textSecondary,
+            ),
           ],
         ),
         actions: [
@@ -375,9 +385,13 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
   void _showCustomerDialogMobile(BuildContext context) {
     final order = ref.read(currentOrderProvider);
     if (order == null) return;
-    
-    final nameController = TextEditingController(text: order.customerName ?? '');
-    final phoneController = TextEditingController(text: order.customerPhone ?? '');
+
+    final nameController = TextEditingController(
+      text: order.customerName ?? '',
+    );
+    final phoneController = TextEditingController(
+      text: order.customerPhone ?? '',
+    );
 
     showModalBottomSheet(
       context: context,
@@ -433,10 +447,16 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
                 Expanded(
                   child: FilledButton(
                     onPressed: () {
-                      ref.read(currentOrderProvider.notifier).updateCustomerDetails(
-                        name: nameController.text.trim().isEmpty ? null : nameController.text.trim(),
-                        phone: phoneController.text.trim().isEmpty ? null : phoneController.text.trim(),
-                      );
+                      ref
+                          .read(currentOrderProvider.notifier)
+                          .updateCustomerDetails(
+                            name: nameController.text.trim().isEmpty
+                                ? null
+                                : nameController.text.trim(),
+                            phone: phoneController.text.trim().isEmpty
+                                ? null
+                                : phoneController.text.trim(),
+                          );
                       Navigator.pop(ctx);
                     },
                     child: const Text('Save'),
@@ -452,7 +472,36 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
   }
 
   Widget _buildMenuGrid() {
+    final menuState = ref.watch(menuProvider);
     final items = ref.watch(searchedMenuItemsProvider);
+
+    // Show loading indicator
+    if (menuState.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    // Show error if any
+    if (menuState.error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: AppColors.error),
+            const SizedBox(height: 8),
+            Text(
+              menuState.error!,
+              style: const TextStyle(color: AppColors.textSecondary),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => ref.read(menuProvider.notifier).loadMenu(),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
 
     if (items.isEmpty) {
       return const Center(
@@ -482,10 +531,7 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
           itemCount: items.length,
           itemBuilder: (context, index) {
             final item = items[index];
-            return MenuItemCard(
-              item: item,
-              onTap: () => _onMenuItemTap(item),
-            );
+            return MenuItemCard(item: item, onTap: () => _onMenuItemTap(item));
           },
         );
       },
@@ -518,10 +564,9 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
     final order = ref.read(currentOrderProvider);
     if (order != null) {
       ref.read(ordersProvider.notifier).addOrder(order);
-      ref.read(tablesProvider.notifier).updateRunningTotal(
-        widget.tableId,
-        order.grandTotal,
-      );
+      ref
+          .read(tablesProvider.notifier)
+          .updateRunningTotal(widget.tableId, order.grandTotal);
       Toast.success(context, 'Order saved');
     }
   }
@@ -538,35 +583,35 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
 }
 
 class _VariantSelectorSheet extends StatefulWidget {
-  final MenuItem item;
-  final Function(MenuItemVariant?, List<MenuItemAddon>?) onSelect;
+  final ApiMenuItem item;
+  final Function(ApiItemVariant?, List<ApiItemAddon>?) onSelect;
 
-  const _VariantSelectorSheet({
-    required this.item,
-    required this.onSelect,
-  });
+  const _VariantSelectorSheet({required this.item, required this.onSelect});
 
   @override
   State<_VariantSelectorSheet> createState() => _VariantSelectorSheetState();
 }
 
 class _VariantSelectorSheetState extends State<_VariantSelectorSheet> {
-  MenuItemVariant? _selectedVariant;
-  final Set<String> _selectedAddonIds = {};
+  ApiItemVariant? _selectedVariant;
+  final Set<int> _selectedAddonIds = {};
 
   @override
   void initState() {
     super.initState();
-    _selectedVariant = widget.item.variants.firstWhere(
-      (v) => v.isDefault,
-      orElse: () => widget.item.variants.first,
-    );
+    final variants = widget.item.variants ?? [];
+    if (variants.isNotEmpty) {
+      _selectedVariant = variants.firstWhere(
+        (v) => v.isDefault,
+        orElse: () => variants.first,
+      );
+    }
   }
 
-  List<MenuItemAddon> get _selectedAddons {
-    return widget.item.addons
-        .where((a) => _selectedAddonIds.contains(a.id))
-        .toList();
+  List<ApiItemAddon> get _allAddons => widget.item.allAddons;
+
+  List<ApiItemAddon> get _selectedAddons {
+    return _allAddons.where((a) => _selectedAddonIds.contains(a.id)).toList();
   }
 
   @override
@@ -579,27 +624,23 @@ class _VariantSelectorSheetState extends State<_VariantSelectorSheet> {
         children: [
           Text(
             widget.item.name,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: AppSpacing.md),
-          if (widget.item.variants.isNotEmpty) ...[
+          if ((widget.item.variants ?? []).isNotEmpty) ...[
             const Text(
               'Select Variant',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: AppSpacing.sm),
             Wrap(
               spacing: AppSpacing.sm,
-              children: widget.item.variants.map((variant) {
+              children: (widget.item.variants ?? []).map((variant) {
                 final isSelected = variant.id == _selectedVariant?.id;
                 return ChoiceChip(
-                  label: Text('${variant.name} - ₹${variant.price.toStringAsFixed(0)}'),
+                  label: Text(
+                    '${variant.name} - ₹${variant.price.toStringAsFixed(0)}',
+                  ),
                   selected: isSelected,
                   onSelected: (selected) {
                     setState(() => _selectedVariant = variant);
@@ -608,35 +649,116 @@ class _VariantSelectorSheetState extends State<_VariantSelectorSheet> {
               }).toList(),
             ),
           ],
-          if (widget.item.addons.isNotEmpty) ...[
+          // Show addon groups with their options
+          if ((widget.item.addonGroups ?? []).isNotEmpty) ...[
             const SizedBox(height: AppSpacing.md),
-            const Text(
-              'Add-ons',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Wrap(
-              spacing: AppSpacing.sm,
-              children: widget.item.addons.map((addon) {
-                final isSelected = _selectedAddonIds.contains(addon.id);
-                return FilterChip(
-                  label: Text('${addon.name} +₹${addon.price.toStringAsFixed(0)}'),
-                  selected: isSelected,
-                  onSelected: (selected) {
-                    setState(() {
-                      if (selected) {
-                        _selectedAddonIds.add(addon.id);
-                      } else {
-                        _selectedAddonIds.remove(addon.id);
-                      }
-                    });
-                  },
-                );
-              }).toList(),
-            ),
+            ...(widget.item.addonGroups ?? []).map((group) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        group.name,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (group.isRequired)
+                        Container(
+                          margin: const EdgeInsets.only(left: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.error.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'Required',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: AppColors.error,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.xs,
+                    children: group.addons.map((addon) {
+                      final isSelected = _selectedAddonIds.contains(addon.id);
+                      return FilterChip(
+                        label: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Veg/Non-veg indicator for addon
+                            Container(
+                              width: 10,
+                              height: 10,
+                              margin: const EdgeInsets.only(right: 4),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: addon.isVeg
+                                      ? AppColors.success
+                                      : AppColors.error,
+                                  width: 1,
+                                ),
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                              child: Center(
+                                child: Container(
+                                  width: 4,
+                                  height: 4,
+                                  decoration: BoxDecoration(
+                                    color: addon.isVeg
+                                        ? AppColors.success
+                                        : AppColors.error,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Text(addon.name),
+                            if (addon.price > 0)
+                              Text(
+                                ' +₹${addon.price.toStringAsFixed(0)}',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                          ],
+                        ),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          setState(() {
+                            if (selected) {
+                              // Check max selection limit
+                              final selectedInGroup = group.addons
+                                  .where(
+                                    (a) => _selectedAddonIds.contains(a.id),
+                                  )
+                                  .length;
+                              if (selectedInGroup < group.maxSelection) {
+                                _selectedAddonIds.add(addon.id);
+                              }
+                            } else {
+                              _selectedAddonIds.remove(addon.id);
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                ],
+              );
+            }),
           ],
           const SizedBox(height: AppSpacing.lg),
           PrimaryButton(
@@ -688,7 +810,10 @@ class _MobileOrderBar extends StatelessWidget {
                 child: GestureDetector(
                   onTap: onViewOrder,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.scaffoldBackground,
                       borderRadius: BorderRadius.circular(8),
@@ -733,7 +858,10 @@ class _MobileOrderBar extends StatelessWidget {
                           ],
                         ),
                         const Spacer(),
-                        const Icon(Icons.chevron_right, color: AppColors.textSecondary),
+                        const Icon(
+                          Icons.chevron_right,
+                          color: AppColors.textSecondary,
+                        ),
                       ],
                     ),
                   ),
@@ -746,7 +874,9 @@ class _MobileOrderBar extends StatelessWidget {
                 child: ElevatedButton(
                   onPressed: onKot,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: onKot != null ? AppColors.success : AppColors.textHint,
+                    backgroundColor: onKot != null
+                        ? AppColors.success
+                        : AppColors.textHint,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     shape: RoundedRectangleBorder(
@@ -755,10 +885,7 @@ class _MobileOrderBar extends StatelessWidget {
                   ),
                   child: const Text(
                     'KOT',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),

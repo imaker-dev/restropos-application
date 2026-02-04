@@ -1,10 +1,64 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../layout/data/models/layout_models.dart';
+import '../../../layout/data/repositories/layout_repository.dart';
 import '../../domain/entities/table_entity.dart';
-import '../../data/dummy_data/dummy_tables.dart';
 
-// Sections provider
+// Floors provider - fetches floors from API or user's assigned floors
+final floorsProvider = FutureProvider<List<Floor>>((ref) async {
+  final repository = ref.watch(layoutRepositoryProvider);
+  final user = ref.watch(currentUserProvider);
+
+  // Parse outletId from dynamic to int
+  int outletId = 4; // Default outlet ID
+  if (user?.primaryOutletId != null) {
+    final dynamic rawId = user!.primaryOutletId;
+    if (rawId is int) {
+      outletId = rawId;
+    } else if (rawId is String) {
+      outletId = int.tryParse(rawId) ?? 4;
+    }
+  }
+
+  // Get floors from API
+  final result = await repository.getFloors(outletId);
+
+  return result.when(
+    success: (floors, _) {
+      // Filter by user's assigned floors if available
+      if (user != null && user.assignedFloors.isNotEmpty) {
+        return floors.where((f) => user.assignedFloors.contains(f.id)).toList();
+      }
+      return floors;
+    },
+    failure: (_, __, ___) => <Floor>[],
+  );
+});
+
+// Selected floor provider
+final selectedFloorProvider = StateProvider<int?>((ref) {
+  return null; // null means show first floor or all
+});
+
+// Sections provider - fetches sections from floor details
 final sectionsProvider = Provider<List<TableSection>>((ref) {
-  return DummyTables.sections;
+  // Sections are derived from tables grouped by sectionId and sectionName
+  final tables = ref.watch(tablesProvider).tables;
+  final currentFloorId = ref.watch(selectedFloorProvider);
+  final floorIdStr = currentFloorId?.toString() ?? '';
+
+  // Group by sectionId to get unique sections
+  final sectionMap = <String, String>{};
+  for (final table in tables) {
+    sectionMap[table.sectionId] = table.sectionName;
+  }
+
+  return sectionMap.entries
+      .map(
+        (entry) =>
+            TableSection(id: entry.key, name: entry.value, floorId: floorIdStr),
+      )
+      .toList();
 });
 
 // Selected section provider
@@ -18,51 +72,55 @@ final selectedStatusFilterProvider = StateProvider<TableStatus?>((ref) {
 });
 
 // Tables provider with optimistic updates
-final tablesProvider = StateNotifierProvider<TablesNotifier, TablesState>((ref) {
-  return TablesNotifier();
+final tablesProvider = StateNotifierProvider<TablesNotifier, TablesState>((
+  ref,
+) {
+  final repository = ref.watch(layoutRepositoryProvider);
+  return TablesNotifier(repository);
 });
 
 // Filtered tables by section
 final filteredTablesProvider = Provider<List<RestaurantTable>>((ref) {
   final tablesState = ref.watch(tablesProvider);
   final selectedSection = ref.watch(selectedSectionProvider);
-  
+
   if (selectedSection == null) {
     return tablesState.tables;
   }
-  
+
   return tablesState.tables
       .where((t) => t.sectionId == selectedSection)
       .toList();
 });
 
 // Tables grouped by section with optional status filter
-final tablesGroupedBySectionProvider = Provider<Map<String, List<RestaurantTable>>>((ref) {
-  final tables = ref.watch(tablesProvider).tables;
-  final sections = ref.watch(sectionsProvider);
-  final statusFilter = ref.watch(selectedStatusFilterProvider);
-  
-  final Map<String, List<RestaurantTable>> grouped = {};
-  
-  for (final section in sections) {
-    var sectionTables = tables.where((t) => t.sectionId == section.id);
-    
-    // Apply status filter if selected
-    if (statusFilter != null) {
-      sectionTables = sectionTables.where((t) => t.status == statusFilter);
-    }
-    
-    final tablesList = sectionTables.toList()
-      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-    
-    // Only include sections that have tables after filtering
-    if (tablesList.isNotEmpty) {
-      grouped[section.name] = tablesList;
-    }
-  }
-  
-  return grouped;
-});
+final tablesGroupedBySectionProvider =
+    Provider<Map<String, List<RestaurantTable>>>((ref) {
+      final tables = ref.watch(tablesProvider).tables;
+      final sections = ref.watch(sectionsProvider);
+      final statusFilter = ref.watch(selectedStatusFilterProvider);
+
+      final Map<String, List<RestaurantTable>> grouped = {};
+
+      for (final section in sections) {
+        var sectionTables = tables.where((t) => t.sectionId == section.id);
+
+        // Apply status filter if selected
+        if (statusFilter != null) {
+          sectionTables = sectionTables.where((t) => t.status == statusFilter);
+        }
+
+        final tablesList = sectionTables.toList()
+          ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+        // Only include sections that have tables after filtering
+        if (tablesList.isNotEmpty) {
+          grouped[section.name] = tablesList;
+        }
+      }
+
+      return grouped;
+    });
 
 // Single table provider for optimized rebuilds
 final tableProvider = Provider.family<RestaurantTable?, String>((ref, tableId) {
@@ -81,11 +139,11 @@ final selectedTableProvider = StateProvider<String?>((ref) => null);
 final tableCountsProvider = Provider<Map<TableStatus, int>>((ref) {
   final tables = ref.watch(tablesProvider).tables;
   final Map<TableStatus, int> counts = {};
-  
+
   for (final status in TableStatus.values) {
     counts[status] = tables.where((t) => t.status == status).length;
   }
-  
+
   return counts;
 });
 
@@ -94,12 +152,14 @@ class TablesState {
   final bool isLoading;
   final String? error;
   final DateTime lastUpdated;
+  final int? currentFloorId;
 
   TablesState({
     required this.tables,
     this.isLoading = false,
     this.error,
     DateTime? lastUpdated,
+    this.currentFloorId,
   }) : lastUpdated = lastUpdated ?? DateTime.now();
 
   TablesState copyWith({
@@ -107,22 +167,144 @@ class TablesState {
     bool? isLoading,
     String? error,
     DateTime? lastUpdated,
+    int? currentFloorId,
   }) {
     return TablesState(
       tables: tables ?? this.tables,
       isLoading: isLoading ?? this.isLoading,
       error: error,
       lastUpdated: lastUpdated ?? DateTime.now(),
+      currentFloorId: currentFloorId ?? this.currentFloorId,
     );
   }
 
-  factory TablesState.initial() => TablesState(
-    tables: DummyTables.tables,
-  );
+  factory TablesState.initial() => TablesState(tables: []);
 }
 
 class TablesNotifier extends StateNotifier<TablesState> {
-  TablesNotifier() : super(TablesState.initial());
+  final LayoutRepository? _repository;
+
+  TablesNotifier([this._repository]) : super(TablesState.initial());
+
+  /// Load tables from floor details API (includes tables in response)
+  Future<void> loadTablesByFloorDetails(int floorId) async {
+    if (_repository == null) return;
+
+    state = state.copyWith(isLoading: true, error: null);
+
+    final result = await _repository.getFloorDetails(floorId);
+
+    result.when(
+      success: (floor, _) {
+        final apiTables = floor.tables ?? [];
+        final tables = apiTables.map((t) => _mapApiTableToEntity(t)).toList();
+        state = state.copyWith(
+          tables: tables,
+          isLoading: false,
+          currentFloorId: floorId,
+        );
+      },
+      failure: (message, _, __) {
+        state = state.copyWith(isLoading: false, error: message);
+      },
+    );
+  }
+
+  /// Load tables from API by floor (fallback)
+  Future<void> loadTablesByFloor(int floorId) async {
+    if (_repository == null) return;
+
+    state = state.copyWith(isLoading: true, error: null);
+
+    final result = await _repository.getTablesByFloor(floorId);
+
+    result.when(
+      success: (apiTables, _) {
+        final tables = apiTables.map((t) => _mapApiTableToEntity(t)).toList();
+        state = state.copyWith(
+          tables: tables,
+          isLoading: false,
+          currentFloorId: floorId,
+        );
+      },
+      failure: (message, _, __) {
+        state = state.copyWith(isLoading: false, error: message);
+      },
+    );
+  }
+
+  /// Load tables from API by outlet
+  Future<void> loadTablesByOutlet(int outletId) async {
+    if (_repository == null) return;
+
+    state = state.copyWith(isLoading: true, error: null);
+
+    final result = await _repository.getTablesByOutlet(outletId);
+
+    result.when(
+      success: (apiTables, _) {
+        final tables = apiTables.map((t) => _mapApiTableToEntity(t)).toList();
+        state = state.copyWith(tables: tables, isLoading: false);
+      },
+      failure: (message, _, __) {
+        state = state.copyWith(isLoading: false, error: message);
+      },
+    );
+  }
+
+  /// Map API table to domain entity
+  RestaurantTable _mapApiTableToEntity(ApiTable apiTable) {
+    return RestaurantTable(
+      id: apiTable.id.toString(),
+      name: apiTable.tableNumber ?? apiTable.name,
+      sectionId: apiTable.sectionId?.toString() ?? '',
+      sectionName: apiTable.sectionName ?? '',
+      status: _mapApiStatusToTableStatus(apiTable.status),
+      capacity: apiTable.capacity ?? 4,
+      sortOrder: apiTable.id, // Use ID as sort order fallback
+      guestCount: apiTable.currentCovers,
+      runningTotal: apiTable.orderTotal,
+      orderStartedAt: apiTable.sessionStart,
+    );
+  }
+
+  /// Map API status string to TableStatus enum
+  TableStatus _mapApiStatusToTableStatus(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'available':
+      case 'blank':
+        return TableStatus.blank;
+      case 'occupied':
+      case 'running':
+        return TableStatus.running;
+      case 'running_kot':
+      case 'kot_pending':
+        return TableStatus.runningKot;
+      case 'printed':
+      case 'billed':
+        return TableStatus.printed;
+      case 'paid':
+        return TableStatus.paid;
+      case 'locked':
+      case 'reserved':
+        return TableStatus.locked;
+      default:
+        return TableStatus.blank;
+    }
+  }
+
+  /// Update table from WebSocket event
+  void updateTable(ApiTable apiTable) {
+    final updatedTable = _mapApiTableToEntity(apiTable);
+    final tables = state.tables.map((table) {
+      if (table.id == updatedTable.id) {
+        return updatedTable;
+      }
+      return table;
+    }).toList();
+
+    state = state.copyWith(tables: tables);
+  }
 
   void updateTableStatus(String tableId, TableStatus status) {
     final tables = state.tables.map((table) {
@@ -131,7 +313,7 @@ class TablesNotifier extends StateNotifier<TablesState> {
       }
       return table;
     }).toList();
-    
+
     state = state.copyWith(tables: tables);
   }
 
@@ -146,7 +328,7 @@ class TablesNotifier extends StateNotifier<TablesState> {
       }
       return table;
     }).toList();
-    
+
     state = state.copyWith(tables: tables);
   }
 
@@ -165,7 +347,7 @@ class TablesNotifier extends StateNotifier<TablesState> {
       }
       return table;
     }).toList();
-    
+
     state = state.copyWith(tables: tables);
   }
 
@@ -180,7 +362,7 @@ class TablesNotifier extends StateNotifier<TablesState> {
       }
       return table;
     }).toList();
-    
+
     state = state.copyWith(tables: tables);
   }
 
@@ -191,7 +373,7 @@ class TablesNotifier extends StateNotifier<TablesState> {
       }
       return table;
     }).toList();
-    
+
     state = state.copyWith(tables: tables);
   }
 
@@ -202,7 +384,7 @@ class TablesNotifier extends StateNotifier<TablesState> {
       }
       return table;
     }).toList();
-    
+
     state = state.copyWith(tables: tables);
   }
 
@@ -225,14 +407,10 @@ class TablesNotifier extends StateNotifier<TablesState> {
   }
 
   Future<void> refresh() async {
-    state = state.copyWith(isLoading: true);
-    
-    // Simulate API call
-    await Future.delayed(const Duration(milliseconds: 500));
-    
-    state = state.copyWith(
-      tables: DummyTables.generateTables(),
-      isLoading: false,
-    );
+    // Reload tables from API using current floor
+    final currentFloor = state.currentFloorId;
+    if (currentFloor != null) {
+      await loadTablesByFloorDetails(currentFloor);
+    }
   }
 }
