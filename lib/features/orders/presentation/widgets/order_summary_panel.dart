@@ -65,11 +65,7 @@ class OrderSummaryPanel extends ConsumerWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.restaurant_menu,
-              size: 64,
-              color: AppColors.textHint,
-            ),
+            Icon(Icons.restaurant_menu, size: 64, color: AppColors.textHint),
             SizedBox(height: AppSpacing.md),
             Text(
               'No order available',
@@ -83,10 +79,7 @@ class OrderSummaryPanel extends ConsumerWidget {
             Text(
               'Please Select Item from Left Menu Item\nand create new order',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.textHint,
-              ),
+              style: TextStyle(fontSize: 12, color: AppColors.textHint),
             ),
           ],
         ),
@@ -99,18 +92,11 @@ class OrderSummaryPanel extends ConsumerWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.restaurant_menu,
-            size: 48,
-            color: AppColors.textHint,
-          ),
+          Icon(Icons.restaurant_menu, size: 48, color: AppColors.textHint),
           SizedBox(height: AppSpacing.sm),
           Text(
             'No items in order',
-            style: TextStyle(
-              fontSize: 14,
-              color: AppColors.textSecondary,
-            ),
+            style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
           ),
         ],
       ),
@@ -128,10 +114,7 @@ class OrderSummaryPanel extends ConsumerWidget {
           children: [
             const Text(
               'Order',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
             ),
             const SizedBox(width: 8),
             Text(
@@ -142,7 +125,8 @@ class OrderSummaryPanel extends ConsumerWidget {
               ),
             ),
             // Show customer name if set
-            if (order.customerName != null && order.customerName!.isNotEmpty) ...[
+            if (order.customerName != null &&
+                order.customerName!.isNotEmpty) ...[
               const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -153,7 +137,11 @@ class OrderSummaryPanel extends ConsumerWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.person, size: 12, color: AppColors.success),
+                    const Icon(
+                      Icons.person,
+                      size: 12,
+                      color: AppColors.success,
+                    ),
                     const SizedBox(width: 2),
                     Text(
                       order.customerName!,
@@ -171,14 +159,18 @@ class OrderSummaryPanel extends ConsumerWidget {
             // Customer icon - Add customer
             IconButton(
               icon: Icon(
-                order.customerName != null ? Icons.person : Icons.person_add_outlined,
+                order.customerName != null
+                    ? Icons.person
+                    : Icons.person_add_outlined,
                 size: 18,
                 color: order.customerName != null ? AppColors.success : null,
               ),
               onPressed: () => _showCustomerDialog(context, ref, order),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-              tooltip: order.customerName != null ? 'Edit Customer' : 'Add Customer',
+              tooltip: order.customerName != null
+                  ? 'Edit Customer'
+                  : 'Add Customer',
             ),
             // Note icon - Add note
             IconButton(
@@ -209,8 +201,12 @@ class OrderSummaryPanel extends ConsumerWidget {
   }
 
   void _showCustomerDialog(BuildContext context, WidgetRef ref, Order order) {
-    final nameController = TextEditingController(text: order.customerName ?? '');
-    final phoneController = TextEditingController(text: order.customerPhone ?? '');
+    final nameController = TextEditingController(
+      text: order.customerName ?? '',
+    );
+    final phoneController = TextEditingController(
+      text: order.customerPhone ?? '',
+    );
 
     showDialog(
       context: context,
@@ -250,10 +246,16 @@ class OrderSummaryPanel extends ConsumerWidget {
           ),
           FilledButton(
             onPressed: () {
-              ref.read(currentOrderProvider.notifier).updateCustomerDetails(
-                name: nameController.text.trim().isEmpty ? null : nameController.text.trim(),
-                phone: phoneController.text.trim().isEmpty ? null : phoneController.text.trim(),
-              );
+              ref
+                  .read(currentOrderProvider.notifier)
+                  .updateCustomerDetails(
+                    name: nameController.text.trim().isEmpty
+                        ? null
+                        : nameController.text.trim(),
+                    phone: phoneController.text.trim().isEmpty
+                        ? null
+                        : phoneController.text.trim(),
+                  );
               Navigator.pop(ctx);
             },
             child: const Text('Save'),
@@ -287,9 +289,13 @@ class OrderSummaryPanel extends ConsumerWidget {
           ),
           FilledButton(
             onPressed: () {
-              ref.read(currentOrderProvider.notifier).updateNotes(
-                notesController.text.trim().isEmpty ? null : notesController.text.trim(),
-              );
+              ref
+                  .read(currentOrderProvider.notifier)
+                  .updateNotes(
+                    notesController.text.trim().isEmpty
+                        ? null
+                        : notesController.text.trim(),
+                  );
               Navigator.pop(ctx);
             },
             child: const Text('Save'),
@@ -316,10 +322,7 @@ class OrderSummaryPanel extends ConsumerWidget {
             label: 'Pick Up',
             isSelected: order.type == OrderType.pickUp,
           ),
-          _OrderTypeTab(
-            label: 'KOT',
-            isSelected: false,
-          ),
+          _OrderTypeTab(label: 'KOT', isSelected: false),
         ],
       ),
     );
@@ -370,10 +373,7 @@ class OrderSummaryPanel extends ConsumerWidget {
           const Spacer(),
           // Order type badge
           Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 6,
-              vertical: 2,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
               color: AppColors.secondary,
               borderRadius: BorderRadius.circular(4),
@@ -475,9 +475,7 @@ class OrderSummaryPanel extends ConsumerWidget {
               ),
             ),
           ),
-          ...kotItems.map((item) => OrderItemTile(
-            item: item,
-          )),
+          ...kotItems.map((item) => OrderItemTile(item: item)),
         ],
         // Pending items
         if (pendingItems.isNotEmpty) ...[
@@ -497,15 +495,19 @@ class OrderSummaryPanel extends ConsumerWidget {
                 ),
               ),
             ),
-          ...pendingItems.map((item) => OrderItemTile(
-            item: item,
-            onIncrement: () => ref.read(currentOrderProvider.notifier)
-                .updateItemQuantity(item.id, item.quantity + 1),
-            onDecrement: () => ref.read(currentOrderProvider.notifier)
-                .updateItemQuantity(item.id, item.quantity - 1),
-            onRemove: () => ref.read(currentOrderProvider.notifier)
-                .removeItem(item.id),
-          )),
+          ...pendingItems.map(
+            (item) => OrderItemTile(
+              item: item,
+              onIncrement: () => ref
+                  .read(currentOrderProvider.notifier)
+                  .updateItemQuantity(item.id, item.quantity + 1),
+              onDecrement: () => ref
+                  .read(currentOrderProvider.notifier)
+                  .updateItemQuantity(item.id, item.quantity - 1),
+              onRemove: () =>
+                  ref.read(currentOrderProvider.notifier).removeItem(item.id),
+            ),
+          ),
         ],
       ],
     );
@@ -536,10 +538,7 @@ class OrderSummaryPanel extends ConsumerWidget {
                     SizedBox(width: 8),
                     Text(
                       'Total',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.white,
-                      ),
+                      style: TextStyle(fontSize: 14, color: Colors.white),
                     ),
                   ],
                 ),
@@ -606,7 +605,9 @@ class OrderSummaryPanel extends ConsumerWidget {
                 flex: 2,
                 child: _ActionBtn(
                   text: 'KOT',
-                  color: order.hasPendingItems ? AppColors.success : AppColors.textHint,
+                  color: order.hasPendingItems
+                      ? AppColors.success
+                      : AppColors.textHint,
                   onPressed: order.hasPendingItems ? onKot : null,
                 ),
               ),
@@ -615,7 +616,9 @@ class OrderSummaryPanel extends ConsumerWidget {
                 flex: 2,
                 child: _ActionBtn(
                   text: 'KOT + Print',
-                  color: order.hasPendingItems ? AppColors.secondary : AppColors.textHint,
+                  color: order.hasPendingItems
+                      ? AppColors.secondary
+                      : AppColors.textHint,
                   onPressed: order.hasPendingItems ? onKotPrint : null,
                 ),
               ),
@@ -631,10 +634,7 @@ class _OrderTypeTab extends StatelessWidget {
   final String label;
   final bool isSelected;
 
-  const _OrderTypeTab({
-    required this.label,
-    required this.isSelected,
-  });
+  const _OrderTypeTab({required this.label, required this.isSelected});
 
   @override
   Widget build(BuildContext context) {
@@ -667,11 +667,7 @@ class _ActionBtn extends StatelessWidget {
   final Color color;
   final VoidCallback? onPressed;
 
-  const _ActionBtn({
-    required this.text,
-    required this.color,
-    this.onPressed,
-  });
+  const _ActionBtn({required this.text, required this.color, this.onPressed});
 
   @override
   Widget build(BuildContext context) {
@@ -683,16 +679,11 @@ class _ActionBtn extends StatelessWidget {
           backgroundColor: color,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 8),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
         child: Text(
           text,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
           overflow: TextOverflow.ellipsis,
         ),
       ),
@@ -704,10 +695,7 @@ class _PaymentModeChip extends StatelessWidget {
   final String label;
   final bool isSelected;
 
-  const _PaymentModeChip({
-    required this.label,
-    required this.isSelected,
-  });
+  const _PaymentModeChip({required this.label, required this.isSelected});
 
   @override
   Widget build(BuildContext context) {

@@ -50,7 +50,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _submitPasscode() async {
-    if (_passcode.length == 6) {
+    if (_passcode.length == 4) {
       final success = await ref.read(authProvider.notifier).loginWithPasscode(_passcode);
       if (!success) {
         setState(() {
@@ -199,12 +199,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   LoginMode.passcode,
                   authState.loginMode,
                 ),
-                _buildMobileTab(
-                  'Card',
-                  Icons.credit_card,
-                  LoginMode.cardSwipe,
-                  authState.loginMode,
-                ),
+                // _buildMobileTab(
+                //   'Card',
+                //   Icons.credit_card,
+                //   LoginMode.cardSwipe,
+                //   authState.loginMode,
+                // ),
               ],
             ),
           ),
@@ -268,8 +268,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         return _buildCredentialsForm(authState);
       case LoginMode.pin:
         return _buildPinForm(authState);
-      case LoginMode.cardSwipe:
-        return _buildCardSwipeForm(authState);
+      // case LoginMode.cardSwipe:
+      //   return _buildCardSwipeForm(authState);
     }
   }
 

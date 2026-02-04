@@ -13,7 +13,7 @@ enum LoginMode {
   credentials,
   pin,
   passcode,
-  cardSwipe,
+  // cardSwipe,
 }
 
 class AuthState extends Equatable {

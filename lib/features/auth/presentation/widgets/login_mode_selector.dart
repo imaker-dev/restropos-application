@@ -44,14 +44,14 @@ class LoginModeSelector extends StatelessWidget {
             isSelected: currentMode == LoginMode.passcode,
             onTap: () => onModeChanged(LoginMode.passcode),
           ),
-          const Divider(height: 1),
-          _LoginModeItem(
-            icon: Icons.credit_card,
-            label: 'Swipe Card',
-            mode: LoginMode.cardSwipe,
-            isSelected: currentMode == LoginMode.cardSwipe,
-            onTap: () => onModeChanged(LoginMode.cardSwipe),
-          ),
+          // const Divider(height: 1),
+          // _LoginModeItem(
+          //   icon: Icons.credit_card,
+          //   label: 'Swipe Card',
+          //   mode: LoginMode.cardSwipe,
+          //   isSelected: currentMode == LoginMode.cardSwipe,
+          //   onTap: () => onModeChanged(LoginMode.cardSwipe),
+          // ),
         ],
       ),
     );

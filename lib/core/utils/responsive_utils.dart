@@ -27,41 +27,41 @@ class ResponsiveUtils {
     return getDeviceType(context) == DeviceType.desktop;
   }
 
-  static double getTableGridCrossAxisCount(BuildContext context) {
-    final deviceType = getDeviceType(context);
-    switch (deviceType) {
-      case DeviceType.mobile:
-        return 3;
-      case DeviceType.tablet:
-        return 6;
-      case DeviceType.desktop:
-        return 10;
-    }
-  }
+  // static double getTableGridCrossAxisCount(BuildContext context) {
+  //   final deviceType = getDeviceType(context);
+  //   switch (deviceType) {
+  //     case DeviceType.mobile:
+  //       return 3;
+  //     case DeviceType.tablet:
+  //       return 6;
+  //     case DeviceType.desktop:
+  //       return 10;
+  //   }
+  // }
 
-  static double getMenuGridCrossAxisCount(BuildContext context) {
-    final deviceType = getDeviceType(context);
-    switch (deviceType) {
-      case DeviceType.mobile:
-        return 2;
-      case DeviceType.tablet:
-        return 3;
-      case DeviceType.desktop:
-        return 4;
-    }
-  }
+  // static double getMenuGridCrossAxisCount(BuildContext context) {
+  //   final deviceType = getDeviceType(context);
+  //   switch (deviceType) {
+  //     case DeviceType.mobile:
+  //       return 2;
+  //     case DeviceType.tablet:
+  //       return 3;
+  //     case DeviceType.desktop:
+  //       return 4;
+  //   }
+  // }
 
-  static EdgeInsets getScreenPadding(BuildContext context) {
-    final deviceType = getDeviceType(context);
-    switch (deviceType) {
-      case DeviceType.mobile:
-        return const EdgeInsets.all(12);
-      case DeviceType.tablet:
-        return const EdgeInsets.all(16);
-      case DeviceType.desktop:
-        return const EdgeInsets.all(24);
-    }
-  }
+  // static EdgeInsets getScreenPadding(BuildContext context) {
+  //   final deviceType = getDeviceType(context);
+  //   switch (deviceType) {
+  //     case DeviceType.mobile:
+  //       return const EdgeInsets.all(12);
+  //     case DeviceType.tablet:
+  //       return const EdgeInsets.all(16);
+  //     case DeviceType.desktop:
+  //       return const EdgeInsets.all(24);
+  //   }
+  // }
 }
 
 class ResponsiveBuilder extends StatelessWidget {
