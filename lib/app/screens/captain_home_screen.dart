@@ -184,7 +184,7 @@ class _CaptainHomeScreenState extends ConsumerState<CaptainHomeScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
-                          user.role.displayName,
+                          user.primaryRole,
                           style: const TextStyle(
                             fontSize: 11,
                             color: AppColors.textSecondary,
@@ -220,6 +220,16 @@ class _CaptainHomeScreenState extends ConsumerState<CaptainHomeScreen> {
             ),
           ),
           const Divider(),
+          // Profile
+          _DesktopNavItem(
+            icon: Icons.person,
+            label: 'Profile',
+            isSelected: false,
+            onTap: () {
+              context.go('/profile');
+            },
+          ),
+          const SizedBox(height: AppSpacing.sm),
           // Logout
           _DesktopNavItem(
             icon: Icons.logout,
@@ -276,6 +286,16 @@ class _CaptainHomeScreenState extends ConsumerState<CaptainHomeScreen> {
             ),
           ),
           const Divider(),
+          // Profile
+          _TabletNavItem(
+            icon: Icons.person,
+            label: 'Profile',
+            isSelected: false,
+            onTap: () {
+              context.go('/profile');
+            },
+          ),
+          const SizedBox(height: AppSpacing.sm),
           // Logout
           _TabletNavItem(
             icon: Icons.logout,
@@ -362,33 +382,53 @@ class _CaptainHomeScreenState extends ConsumerState<CaptainHomeScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircleAvatar(
-              radius: 32,
-              backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+            GestureDetector(
+              onTap: () {
+                context.go('/profile');
+              },
+              child: CircleAvatar(
+                radius: 32,
+                backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                child: Text(
+                  user?.name[0].toUpperCase() ?? 'U',
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            GestureDetector(
+              onTap: () {
+                Navigator.pop(context); // Close bottom sheet first
+                context.go('/profile');
+              },
               child: Text(
-                user?.name[0].toUpperCase() ?? 'U',
+                user?.name ?? 'User',
                 style: const TextStyle(
-                  fontSize: 24,
+                  fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: AppColors.primary,
                 ),
               ),
             ),
-            const SizedBox(height: AppSpacing.sm),
             Text(
-              user?.name ?? 'User',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(
-              user?.role.displayName ?? '',
+              user?.primaryRole ?? '',
               style: const TextStyle(
                 color: AppColors.textSecondary,
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
+            ListTile(
+              leading: const Icon(Icons.person),
+              title: const Text('View Profile'),
+              onTap: () {
+                Navigator.pop(context);
+                context.go('/profile');
+              },
+            ),
             ListTile(
               leading: const Icon(Icons.logout),
               title: const Text('Logout'),

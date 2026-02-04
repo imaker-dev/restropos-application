@@ -5,8 +5,7 @@ class AppConstants {
   static const String appVersion = '1.0.0';
 
   // API Configuration
-  static const String baseUrl = 'https://api.restropos.com';
-  static const String wsUrl = 'wss://ws.restropos.com';
+  static const String wsUrl = 'wss://sequences-diana-wholesale-adds.trycloudflare.com';
   static const Duration connectionTimeout = Duration(seconds: 30);
   static const Duration receiveTimeout = Duration(seconds: 30);
 

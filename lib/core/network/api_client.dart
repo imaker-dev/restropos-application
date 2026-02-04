@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:restro/core/network/api_endpoints.dart';
 import '../constants/app_constants.dart';
+import '../providers/auth_token_provider.dart';
 
 final dioProvider = Provider<Dio>((ref) {
   final dio = Dio(
@@ -37,10 +38,10 @@ class AuthInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     // Add auth token from provider when available
-    // final token = ref.read(authTokenProvider);
-    // if (token != null) {
-    //   options.headers['Authorization'] = 'Bearer $token';
-    // }
+    final token = ref.read(authTokenProvider);
+    if (token != null) {
+      options.headers['Authorization'] = 'Bearer $token';
+    }
     handler.next(options);
   }
 

@@ -1,94 +1,27 @@
 import 'package:equatable/equatable.dart';
 
-enum UserRole {
-  captain,
-  cashier,
-  manager,
-  admin,
-}
-
-extension UserRoleExtension on UserRole {
-  String get displayName {
-    switch (this) {
-      case UserRole.captain:
-        return 'Captain';
-      case UserRole.cashier:
-        return 'Cashier';
-      case UserRole.manager:
-        return 'Manager';
-      case UserRole.admin:
-        return 'Admin';
-    }
-  }
-
-  bool get canAccessBilling => this != UserRole.captain;
-  bool get canAccessReports => this == UserRole.manager || this == UserRole.admin;
-  bool get canManageUsers => this == UserRole.admin;
-  bool get canModifyMenu => this == UserRole.manager || this == UserRole.admin;
-  bool get canVoidOrders => this != UserRole.captain;
-  bool get canApplyDiscounts => this != UserRole.captain;
-}
-
-class User extends Equatable {
-  final String id;
+class Role extends Equatable {
+  final int id;
   final String name;
-  final String username;
-  final UserRole role;
-  final String? pin;
-  final String? passcode;
-  final String? avatarUrl;
-  final List<String> assignedFloors;
-  final List<String> assignedSections;
-  final bool isActive;
-  final DateTime? lastLoginAt;
-  final DateTime createdAt;
-  final DateTime updatedAt;
+  final String slug;
+  final int outletId;
+  final String outletName;
 
-  const User({
+  const Role({
     required this.id,
     required this.name,
-    required this.username,
-    required this.role,
-    this.pin,
-    this.passcode,
-    this.avatarUrl,
-    this.assignedFloors = const [],
-    this.assignedSections = const [],
-    this.isActive = true,
-    this.lastLoginAt,
-    required this.createdAt,
-    required this.updatedAt,
+    required this.slug,
+    required this.outletId,
+    required this.outletName,
   });
 
-  User copyWith({
-    String? id,
-    String? name,
-    String? username,
-    UserRole? role,
-    String? pin,
-    String? passcode,
-    String? avatarUrl,
-    List<String>? assignedFloors,
-    List<String>? assignedSections,
-    bool? isActive,
-    DateTime? lastLoginAt,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  }) {
-    return User(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      username: username ?? this.username,
-      role: role ?? this.role,
-      pin: pin ?? this.pin,
-      passcode: passcode ?? this.passcode,
-      avatarUrl: avatarUrl ?? this.avatarUrl,
-      assignedFloors: assignedFloors ?? this.assignedFloors,
-      assignedSections: assignedSections ?? this.assignedSections,
-      isActive: isActive ?? this.isActive,
-      lastLoginAt: lastLoginAt ?? this.lastLoginAt,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
+  factory Role.fromJson(Map<String, dynamic> json) {
+    return Role(
+      id: json['id'] as int,
+      name: json['name'] as String,
+      slug: json['slug'] as String,
+      outletId: json['outletId'] as int,
+      outletName: json['outletName'] as String,
     );
   }
 
@@ -96,63 +29,201 @@ class User extends Equatable {
     return {
       'id': id,
       'name': name,
-      'username': username,
-      'role': role.name,
-      'pin': pin,
-      'passcode': passcode,
+      'slug': slug,
+      'outletId': outletId,
+      'outletName': outletName,
+    };
+  }
+
+  @override
+  List<Object?> get props => [id, name, slug, outletId, outletName];
+}
+
+class PermissionModule extends Equatable {
+  final String module;
+  final List<String> permissions;
+
+  const PermissionModule({
+    required this.module,
+    required this.permissions,
+  });
+
+  factory PermissionModule.fromJson(String key, List<dynamic> permissions) {
+    return PermissionModule(
+      module: key,
+      permissions: permissions.cast<String>(),
+    );
+  }
+
+  @override
+  List<Object?> get props => [module, permissions];
+}
+
+class User extends Equatable {
+  final int id;
+  final String uuid;
+  final String employeeCode;
+  final String name;
+  final String? email;
+  final String? phone;
+  final String? avatarUrl;
+  final bool isActive;
+  final bool isVerified;
+  final DateTime? lastLoginAt;
+  final List<Role> roles;
+  final List<String> permissions;
+  final Map<String, List<String>> permissionsByModule;
+
+  const User({
+    required this.id,
+    required this.uuid,
+    required this.employeeCode,
+    required this.name,
+    this.email,
+    this.phone,
+    this.avatarUrl,
+    required this.isActive,
+    required this.isVerified,
+    this.lastLoginAt,
+    this.roles = const [],
+    this.permissions = const [],
+    this.permissionsByModule = const {},
+  });
+
+  User copyWith({
+    int? id,
+    String? uuid,
+    String? employeeCode,
+    String? name,
+    String? email,
+    String? phone,
+    String? avatarUrl,
+    bool? isActive,
+    bool? isVerified,
+    DateTime? lastLoginAt,
+    List<Role>? roles,
+    List<String>? permissions,
+    Map<String, List<String>>? permissionsByModule,
+  }) {
+    return User(
+      id: id ?? this.id,
+      uuid: uuid ?? this.uuid,
+      employeeCode: employeeCode ?? this.employeeCode,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      phone: phone ?? this.phone,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      isActive: isActive ?? this.isActive,
+      isVerified: isVerified ?? this.isVerified,
+      lastLoginAt: lastLoginAt ?? this.lastLoginAt,
+      roles: roles ?? this.roles,
+      permissions: permissions ?? this.permissions,
+      permissionsByModule: permissionsByModule ?? this.permissionsByModule,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'uuid': uuid,
+      'employeeCode': employeeCode,
+      'name': name,
+      'email': email,
+      'phone': phone,
       'avatarUrl': avatarUrl,
-      'assignedFloors': assignedFloors,
-      'assignedSections': assignedSections,
       'isActive': isActive,
+      'isVerified': isVerified,
       'lastLoginAt': lastLoginAt?.toIso8601String(),
-      'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt.toIso8601String(),
+      'roles': roles.map((r) => r.toJson()).toList(),
+      'permissions': permissions,
+      'permissionsByModule': permissionsByModule,
     };
   }
 
   factory User.fromJson(Map<String, dynamic> json) {
+    final rolesList = (json['roles'] as List<dynamic>? ?? [])
+        .map((e) => Role.fromJson(e as Map<String, dynamic>))
+        .toList();
+    
+    final permissionsList = (json['permissions'] as List<dynamic>? ?? [])
+        .map((e) => e as String)
+        .toList();
+    
+    final permissionsByModuleMap = <String, List<String>>{};
+    final permissionsByModuleJson = json['permissionsByModule'] as Map<String, dynamic>? ?? {};
+    permissionsByModuleJson.forEach((key, value) {
+      if (value is List) {
+        permissionsByModuleMap[key] = value.cast<String>();
+      }
+    });
+
     return User(
-      id: json['id'] as String,
+      id: json['id'] as int,
+      uuid: json['uuid'] as String,
+      employeeCode: json['employeeCode'] as String,
       name: json['name'] as String,
-      username: json['username'] as String,
-      role: UserRole.values.firstWhere(
-        (e) => e.name == json['role'],
-        orElse: () => UserRole.captain,
-      ),
-      pin: json['pin'] as String?,
-      passcode: json['passcode'] as String?,
+      email: json['email'] as String?,
+      phone: json['phone'] as String?,
       avatarUrl: json['avatarUrl'] as String?,
-      assignedFloors: (json['assignedFloors'] as List<dynamic>?)
-              ?.map((e) => e as String)
-              .toList() ??
-          [],
-      assignedSections: (json['assignedSections'] as List<dynamic>?)
-              ?.map((e) => e as String)
-              .toList() ??
-          [],
-      isActive: json['isActive'] as bool? ?? true,
+      isActive: (json['isActive'] as int?) == 1,
+      isVerified: (json['isVerified'] as int?) == 1,
       lastLoginAt: json['lastLoginAt'] != null
           ? DateTime.parse(json['lastLoginAt'] as String)
           : null,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      roles: rolesList,
+      permissions: permissionsList,
+      permissionsByModule: permissionsByModuleMap,
     );
   }
 
   @override
   List<Object?> get props => [
         id,
+        uuid,
+        employeeCode,
         name,
-        username,
-        role,
-        pin,
-        passcode,
+        email,
+        phone,
         avatarUrl,
-        assignedFloors,
-        assignedSections,
         isActive,
+        isVerified,
         lastLoginAt,
-        createdAt,
-        updatedAt,
+        roles,
+        permissions,
+        permissionsByModule,
       ];
+
+  // Permission helpers
+  bool hasPermission(String permission) => permissions.contains(permission);
+  
+  bool hasModulePermission(String module, String permission) {
+    return permissionsByModule[module]?.contains(permission) ?? false;
+  }
+  
+  bool get canViewTables => hasPermission('TABLE_VIEW');
+  bool get canMergeTables => hasPermission('TABLE_MERGE');
+  bool get canTransferTables => hasPermission('TABLE_TRANSFER');
+  bool get canViewOrders => hasPermission('ORDER_VIEW');
+  bool get canCreateOrders => hasPermission('ORDER_CREATE');
+  bool get canModifyOrders => hasPermission('ORDER_MODIFY');
+  bool get canSendKOT => hasPermission('KOT_SEND');
+  bool get canModifyKOT => hasPermission('KOT_MODIFY');
+  bool get canReprintKOT => hasPermission('KOT_REPRINT');
+  bool get canViewBills => hasPermission('BILL_VIEW');
+  bool get canGenerateBills => hasPermission('BILL_GENERATE');
+  bool get canReprintBills => hasPermission('BILL_REPRINT');
+  bool get canCollectPayments => hasPermission('PAYMENT_COLLECT');
+  bool get canSplitPayments => hasPermission('PAYMENT_SPLIT');
+  bool get canApplyDiscounts => hasPermission('DISCOUNT_APPLY');
+  bool get canAddTips => hasPermission('TIP_ADD');
+  bool get canViewItems => hasPermission('ITEM_VIEW');
+  bool get canCancelItems => hasPermission('ITEM_CANCEL');
+  bool get canViewCategories => hasPermission('CATEGORY_VIEW');
+  bool get canViewReports => hasPermission('REPORT_VIEW');
+  bool get canViewFloors => hasPermission('FLOOR_VIEW');
+  bool get canViewSections => hasPermission('SECTION_VIEW');
+  
+  String get displayName => name;
+  String get primaryRole => roles.isNotEmpty ? roles.first.name : 'Unknown';
+  String get outletName => roles.isNotEmpty ? roles.first.outletName : 'Unknown';
 }

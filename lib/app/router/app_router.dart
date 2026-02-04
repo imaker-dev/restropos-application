@@ -4,27 +4,12 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/auth.dart';
 import '../../features/orders/presentation/screens/screens.dart';
 import '../screens/captain_home_screen.dart';
+import '../../features/auth/presentation/screens/user_profile_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authProvider);
-
   return GoRouter(
-    initialLocation: '/login',
+    initialLocation: '/',
     debugLogDiagnostics: true,
-    redirect: (context, state) {
-      final isAuthenticated = authState.isAuthenticated;
-      final isLoggingIn = state.matchedLocation == '/login';
-
-      if (!isAuthenticated && !isLoggingIn) {
-        return '/login';
-      }
-
-      if (isAuthenticated && isLoggingIn) {
-        return '/';
-      }
-
-      return null;
-    },
     routes: [
       GoRoute(
         path: '/login',
@@ -43,6 +28,11 @@ final routerProvider = Provider<GoRouter>((ref) {
               final tableId = state.pathParameters['tableId']!;
               return OrderScreen(tableId: tableId);
             },
+          ),
+          GoRoute(
+            path: 'profile',
+            name: 'profile',
+            builder: (context, state) => const UserProfileScreen(),
           ),
         ],
       ),

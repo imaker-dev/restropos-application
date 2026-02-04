@@ -42,7 +42,7 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
         ref.read(currentOrderProvider.notifier).createOrder(
           tableId: table.id,
           tableName: table.name,
-          captainId: user.id,
+          captainId: user.id.toString(),
           captainName: user.name,
           guestCount: table.guestCount ?? 1,
         );
@@ -96,7 +96,7 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
       tableId: order.tableId,
       tableName: order.tableName,
       items: pendingItems,
-      captainId: user.id,
+      captainId: user.id.toString(),
       captainName: user.name,
     );
 
