@@ -1,16 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/network/api_service.dart';
 import '../../../../core/network/websocket_service.dart';
+import '../../../../core/auth/app_preferences.dart';
 import '../../data/models/auth_models.dart';
 import '../../data/repositories/auth_repository.dart';
 import 'auth_state.dart';
 
-// Secure storage for token persistence
-final _secureStorage = FlutterSecureStorage();
-const _tokenKey = 'access_token';
-const _userIdKey = 'user_id';
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final repository = ref.watch(authRepositoryProvider);
@@ -69,12 +65,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
     return result.when(
       success: (data, message) async {
-        // Store token securely
-        await _secureStorage.write(key: _tokenKey, value: data.accessToken);
-        await _secureStorage.write(
-          key: _userIdKey,
-          value: data.user.id.toString(),
-        );
+        await AppPreferences.setSessionToken(data.accessToken);
+        await AppPreferences.setUserId(data.user.id.toString());
 
         // Update outlet ID
         final outletId =
@@ -119,18 +111,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
     return result.when(
       success: (data, message) async {
-        // Store token
-        await _secureStorage.write(key: _tokenKey, value: data.accessToken);
+        await AppPreferences.setSessionToken(data.accessToken);
 
         // Fetch profile and permissions
         final profileResult = await _repository.getProfile();
 
         return profileResult.when(
           success: (user, _) async {
-            await _secureStorage.write(
-              key: _userIdKey,
-              value: user.id.toString(),
-            );
+            await AppPreferences.setUserId(user.id.toString());
 
             final permissions = await _fetchPermissions();
 
@@ -173,10 +161,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// Restore session from stored token
   Future<void> restoreSession() async {
+    if (state.isSessionRestoring || state.isAuthenticated) {
+      return;
+    }
+
     state = state.copyWith(isSessionRestoring: true);
 
     try {
-      final token = await _secureStorage.read(key: _tokenKey);
+      final token = await AppPreferences.getSessionToken();
 
       if (token == null || token.isEmpty) {
         state = AuthState.unauthenticated();
@@ -187,11 +179,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Note: The token will be used by the API client interceptor
       final profileResult = await _repository.getProfile();
 
-      profileResult.when(
+      await profileResult.when(
         success: (user, _) async {
-          final permissions = await _fetchPermissions();
+          // Fetch permissions in parallel with other operations
+          final permissionsFuture = _fetchPermissions();
           final outletId = user.primaryOutletId ?? ApiEndpoints.defaultOutletId;
           _ref.read(outletIdProvider.notifier).state = outletId;
+          
+          final permissions = await permissionsFuture;
 
           state = AuthState.authenticated(
             user: user,
@@ -214,8 +209,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// Clear stored session data
   Future<void> _clearStoredSession() async {
-    await _secureStorage.delete(key: _tokenKey);
-    await _secureStorage.delete(key: _userIdKey);
+    await AppPreferences.clearSessionToken();
+    await AppPreferences.clearUserId();
   }
 
   /// Logout

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/auth/app_preferences.dart';
 import '../../core/constants/constants.dart';
 import '../../core/providers/connectivity_provider.dart';
 import '../../core/utils/responsive_utils.dart';
@@ -8,6 +9,7 @@ import '../../features/auth/data/models/auth_models.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/menu/data/models/menu_models.dart';
 import '../../features/menu/menu.dart' hide MenuItemType;
+import '../../features/order_history/presentation/order_history_screen.dart';
 import '../../features/tables/tables.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 
@@ -23,11 +25,10 @@ class _CaptainHomeScreenState extends ConsumerState<CaptainHomeScreen> {
 
   final List<_NavItem> _navItems = const [
     _NavItem(icon: Icons.table_restaurant, label: 'Tables'),
-    _NavItem(icon: Icons.receipt_long, label: 'Orders'),
-    _NavItem(icon: Icons.grid_view, label: 'Menu'),
-    _NavItem(icon: Icons.delivery_dining, label: 'Delivery'),
-    _NavItem(icon: Icons.history, label: 'History'),
-    _NavItem(icon: Icons.history, label: 'History'),
+    _NavItem(icon: Icons.edit_note_sharp, label: 'Orders'),
+    _NavItem(icon: Icons.dining, label: 'Menu'),
+    // _NavItem(icon: Icons.delivery_dining, label: 'Delivery'),
+    _NavItem(icon: Icons.history_toggle_off, label: 'History'),
   ];
 
   @override
@@ -82,8 +83,8 @@ class _CaptainHomeScreenState extends ConsumerState<CaptainHomeScreen> {
               _navItems[_selectedIndex].label,
               style: const TextStyle(fontSize: 16),
             ),
-            const SizedBox(width: 8),
-            const CompactConnectivityIndicator(),
+            // const SizedBox(width: 8),
+            // const CompactConnectivityIndicator(),
           ],
         ),
         actions: [
@@ -299,12 +300,12 @@ class _CaptainHomeScreenState extends ConsumerState<CaptainHomeScreen> {
         return _buildOrdersView();
       case 2:
         return _buildMenuView();
+      // case 3:
+      //   return _buildDeliveryView();
       case 3:
-        return _buildDeliveryView();
-      case 4:
-        return _buildHistoryView();
-      case 5:
-        return _buildHistoryView();
+        return OrderHistoryScreen();
+      // case 5:
+      //   return _buildHistoryView();
       default:
         return TableViewScreen(onTableSelected: _navigateToOrder);
     }
@@ -413,7 +414,9 @@ class _CaptainHomeScreenState extends ConsumerState<CaptainHomeScreen> {
     );
   }
 
-  void _logout() {
+  void _logout() async{
+    await AppPreferences.clearSessionToken();
+    await AppPreferences.clearUserId();
     ref.read(authProvider.notifier).logout();
     context.go('/login');
   }
@@ -773,12 +776,29 @@ class _MenuManagementView extends ConsumerStatefulWidget {
 }
 
 class _MenuManagementViewState extends ConsumerState<_MenuManagementView> {
+  int _selectedCategoryIndex = 0;
+
   @override
   void initState() {
     super.initState();
-    // Load menu from API when view is opened
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(menuProvider.notifier).loadMenu();
+    });
+  }
+
+  List<ApiMenuItem> _getFilteredItems(List<ApiMenuItem> items, List<ApiCategory> categories) {
+    if (_selectedCategoryIndex == 0) {
+      return items;
+    } else if (_selectedCategoryIndex < categories.length) {
+      final selectedCategory = categories[_selectedCategoryIndex];
+      return items.where((item) => item.categoryId == selectedCategory.id).toList();
+    }
+    return items;
+  }
+
+  void _onCategorySelected(int index) {
+    setState(() {
+      _selectedCategoryIndex = index;
     });
   }
 
@@ -786,6 +806,12 @@ class _MenuManagementViewState extends ConsumerState<_MenuManagementView> {
   Widget build(BuildContext context) {
     final categories = ref.watch(categoriesProvider);
     final items = ref.watch(menuItemsProvider);
+    
+     final allCategories = [
+      const ApiCategory(id: -1, name: 'All', isActive: true),
+      ...categories,
+    ];
+    final filteredItems = _getFilteredItems(items, allCategories);
 
     return Column(
       children: [
@@ -801,7 +827,7 @@ class _MenuManagementViewState extends ConsumerState<_MenuManagementView> {
               ),
               const Spacer(),
               Text(
-                '${items.length} items',
+                '${filteredItems.length} items',
                 style: const TextStyle(color: AppColors.textSecondary),
               ),
             ],
@@ -815,33 +841,47 @@ class _MenuManagementViewState extends ConsumerState<_MenuManagementView> {
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 8),
-            itemCount: categories.length,
+            itemCount: allCategories.length,
             itemBuilder: (context, index) {
-              final category = categories[index];
+              final category = allCategories[index];
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                 child: FilterChip(
-                  label: Text(category.name),
-                  selected: index == 0,
-                  onSelected: (_) {},
+                  label: Container(
+                    constraints: BoxConstraints(
+                      minHeight: 25,
+                    ),
+                    child: Center(
+                      child: Text(
+                        textAlign: TextAlign.center,
+                        category.name,
+                        style: TextStyle(
+                          height: 1.0,
+                        ),
+                      ),
+                    ),
+                  ),
+                  selected: index == _selectedCategoryIndex,
+                  onSelected: (_) => _onCategorySelected(index),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                  labelPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
                 ),
               );
             },
           ),
-        ),
-        // Menu items grid
+        ),        // Menu items grid
         Expanded(
           child: GridView.builder(
             padding: const EdgeInsets.all(8),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-              childAspectRatio: 1.5,
+            gridDelegate:  SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: ResponsiveUtils.isMobile(context)? 2 : ResponsiveUtils.isTablet(context)?3:4,
+              crossAxisSpacing: 1,
+              mainAxisSpacing: 1,
+              childAspectRatio: 1.7,
             ),
-            itemCount: items.length,
+            itemCount: filteredItems.length,
             itemBuilder: (context, index) {
-              final item = items[index];
+              final item = filteredItems[index];
               return Card(
                 child: InkWell(
                   onTap: () => _showItemDetails(context, item),

@@ -10,17 +10,24 @@ final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
 
   return GoRouter(
-    initialLocation: '/login',
-    debugLogDiagnostics: true,
+    debugLogDiagnostics: false,
+
     redirect: (context, state) {
       final isAuthenticated = authState.isAuthenticated;
-      final isLoggingIn = state.matchedLocation == '/login';
+      final isRestoring = authState.isSessionRestoring;
 
-      if (!isAuthenticated && !isLoggingIn) {
+      final location = state.matchedLocation;
+      final isLogin = location == '/login';
+
+      if (isRestoring) {
+        return null;
+      }
+
+      if (!isAuthenticated && !isLogin) {
         return '/login';
       }
 
-      if (isAuthenticated && isLoggingIn) {
+      if (isAuthenticated && isLogin) {
         return '/';
       }
 

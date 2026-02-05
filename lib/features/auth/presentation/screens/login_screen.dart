@@ -58,7 +58,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final success = await ref
           .read(authProvider.notifier)
           .loginWithPasscode(_passcode);
-      if (!success) {
+      if (!success && mounted) {
         setState(() {
           _passcode = '';
         });
@@ -94,7 +94,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final success = await ref
           .read(authProvider.notifier)
           .loginWithPin(_employeeCodeController.text, _pin);
-      if (!success) {
+      if (!success && mounted) {
         setState(() {
           _pin = '';
         });

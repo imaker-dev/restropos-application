@@ -1,16 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:restro/core/network/api_endpoints.dart';
+import 'package:restro/core/auth/app_preferences.dart';
 import '../constants/app_constants.dart';
 
-// Token storage key
-const _tokenKey = 'access_token';
-final _secureStorage = FlutterSecureStorage();
-
-// Token provider that reads from secure storage
 final storedTokenProvider = FutureProvider<String?>((ref) async {
-  return await _secureStorage.read(key: _tokenKey);
+  return await AppPreferences.getSessionToken();
 });
 
 final dioProvider = Provider<Dio>((ref) {
@@ -49,9 +44,8 @@ class AuthInterceptor extends Interceptor {
       return;
     }
 
-    // Add auth token from secure storage
     try {
-      final token = await _secureStorage.read(key: _tokenKey);
+      final token = await AppPreferences.getSessionToken();
       if (token != null && token.isNotEmpty) {
         options.headers['Authorization'] = 'Bearer $token';
       }
@@ -65,7 +59,7 @@ class AuthInterceptor extends Interceptor {
   void onError(DioException err, ErrorInterceptorHandler handler) async {
     if (err.response?.statusCode == 401) {
       // Clear token on 401 - session expired
-      await _secureStorage.delete(key: _tokenKey);
+      await AppPreferences.clearSessionToken();
     }
     handler.next(err);
   }

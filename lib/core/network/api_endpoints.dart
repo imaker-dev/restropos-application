@@ -96,4 +96,10 @@ class ApiEndpoints {
   // ============ Reports ============
   static String liveDashboard(int outletId) =>
       "/orders/reports/$outletId/dashboard";
+
+  // ============ Order History ============
+  static String orderHistory(int outletId) => "/orders/history/$outletId";
+  static String orderHistoryByDate(int outletId, String fromDate, String toDate) =>
+      "/orders/history/$outletId?from=$fromDate&to=$toDate";
+  static String orderHistorySummary(int outletId) => "/orders/history/$outletId/summary";
 }
