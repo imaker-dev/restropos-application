@@ -3,6 +3,7 @@ import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/network/api_result.dart';
 import '../../../../core/network/api_service.dart';
 import '../models/layout_models.dart';
+import '../../../tables/data/models/table_details_model.dart';
 
 /// Repository for Layout operations (Floors, Sections, Tables)
 class LayoutRepository {
@@ -68,6 +69,14 @@ class LayoutRepository {
     return _api.get(
       ApiEndpoints.tableById(tableId),
       parser: (json) => ApiTable.fromJson(json as Map<String, dynamic>),
+    );
+  }
+
+  /// Get detailed table information (session, order, items, KOTs, etc.)
+  Future<ApiResult<TableDetailsResponse>> getTableDetails(int tableId) async {
+    return _api.get(
+      ApiEndpoints.tableById(tableId),
+      parser: (json) => TableDetailsResponse.fromJson(json as Map<String, dynamic>),
     );
   }
 

@@ -135,7 +135,7 @@ class OrderSummaryPanel extends ConsumerWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              '#${order.id.substring(0, 6).toUpperCase()}',
+              '#${order.id.length > 6 ? order.id.substring(0, 6).toUpperCase() : order.id.toUpperCase()}',
               style: const TextStyle(
                 fontSize: 12,
                 color: AppColors.textSecondary,

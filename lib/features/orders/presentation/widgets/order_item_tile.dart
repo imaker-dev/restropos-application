@@ -26,8 +26,8 @@ class OrderItemTile extends StatelessWidget {
         vertical: AppSpacing.xs,
       ),
       decoration: BoxDecoration(
-        color: item.hasKot 
-            ? AppColors.success.withValues(alpha: 0.05) 
+        color: item.hasKot
+            ? AppColors.success.withValues(alpha: 0.05)
             : Colors.transparent,
         border: Border(
           bottom: BorderSide(color: AppColors.divider.withValues(alpha: 0.5)),
@@ -35,7 +35,7 @@ class OrderItemTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Remove button (only for pending items)
+          // Remove button (only for pending items) or lock indicator for KOT items
           if (item.canModify)
             GestureDetector(
               onTap: onRemove,
@@ -49,7 +49,17 @@ class OrderItemTile extends StatelessWidget {
               ),
             )
           else
-            const SizedBox(width: 24),
+            Tooltip(
+              message: 'Item sent to kitchen (locked)',
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                child: Icon(
+                  Icons.lock,
+                  size: 14,
+                  color: AppColors.warning.withValues(alpha: 0.8),
+                ),
+              ),
+            ),
           const SizedBox(width: AppSpacing.xs),
           // Item details
           Expanded(
@@ -58,7 +68,7 @@ class OrderItemTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item.variantName != null 
+                  item.variantName != null
                       ? '${item.name} (${item.variantName})'
                       : item.name,
                   style: const TextStyle(

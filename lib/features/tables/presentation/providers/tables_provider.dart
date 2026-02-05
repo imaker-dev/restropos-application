@@ -56,8 +56,8 @@ final sectionsProvider = Provider<List<TableSection>>((ref) {
   return sectionMap.entries
       .map(
         (entry) =>
-            TableSection(id: entry.key, name: entry.value, floorId: floorIdStr),
-      )
+        TableSection(id: entry.key, name: entry.value, floorId: floorIdStr),
+  )
       .toList();
 });
 
@@ -73,8 +73,8 @@ final selectedStatusFilterProvider = StateProvider<TableStatus?>((ref) {
 
 // Tables provider with optimistic updates
 final tablesProvider = StateNotifierProvider<TablesNotifier, TablesState>((
-  ref,
-) {
+    ref,
+    ) {
   final repository = ref.watch(layoutRepositoryProvider);
   return TablesNotifier(repository);
 });
@@ -95,32 +95,32 @@ final filteredTablesProvider = Provider<List<RestaurantTable>>((ref) {
 
 // Tables grouped by section with optional status filter
 final tablesGroupedBySectionProvider =
-    Provider<Map<String, List<RestaurantTable>>>((ref) {
-      final tables = ref.watch(tablesProvider).tables;
-      final sections = ref.watch(sectionsProvider);
-      final statusFilter = ref.watch(selectedStatusFilterProvider);
+Provider<Map<String, List<RestaurantTable>>>((ref) {
+  final tables = ref.watch(tablesProvider).tables;
+  final sections = ref.watch(sectionsProvider);
+  final statusFilter = ref.watch(selectedStatusFilterProvider);
 
-      final Map<String, List<RestaurantTable>> grouped = {};
+  final Map<String, List<RestaurantTable>> grouped = {};
 
-      for (final section in sections) {
-        var sectionTables = tables.where((t) => t.sectionId == section.id);
+  for (final section in sections) {
+    var sectionTables = tables.where((t) => t.sectionId == section.id);
 
-        // Apply status filter if selected
-        if (statusFilter != null) {
-          sectionTables = sectionTables.where((t) => t.status == statusFilter);
-        }
+    // Apply status filter if selected
+    if (statusFilter != null) {
+      sectionTables = sectionTables.where((t) => t.status == statusFilter);
+    }
 
-        final tablesList = sectionTables.toList()
-          ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    final tablesList = sectionTables.toList()
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
 
-        // Only include sections that have tables after filtering
-        if (tablesList.isNotEmpty) {
-          grouped[section.name] = tablesList;
-        }
-      }
+    // Only include sections that have tables after filtering
+    if (tablesList.isNotEmpty) {
+      grouped[section.name] = tablesList;
+    }
+  }
 
-      return grouped;
-    });
+  return grouped;
+});
 
 // Single table provider for optimized rebuilds
 final tableProvider = Provider.family<RestaurantTable?, String>((ref, tableId) {
@@ -272,24 +272,22 @@ class TablesNotifier extends StateNotifier<TablesState> {
   TableStatus _mapApiStatusToTableStatus(String? status) {
     switch (status?.toLowerCase()) {
       case 'available':
-      case 'blank':
-        return TableStatus.blank;
+        return TableStatus.available;
       case 'occupied':
+        return TableStatus.occupied;
       case 'running':
         return TableStatus.running;
-      case 'running_kot':
-      case 'kot_pending':
-        return TableStatus.runningKot;
-      case 'printed':
+      case 'billing':
       case 'billed':
-        return TableStatus.printed;
-      case 'paid':
-        return TableStatus.paid;
-      case 'locked':
+        return TableStatus.billing;
+      case 'cleaning':
+        return TableStatus.cleaning;
+      case 'blocked':
+        return TableStatus.blocked;
       case 'reserved':
-        return TableStatus.locked;
+        return TableStatus.reserved;
       default:
-        return TableStatus.blank;
+        return TableStatus.available;
     }
   }
 
@@ -340,7 +338,7 @@ class TablesNotifier extends StateNotifier<TablesState> {
           name: table.name,
           sectionId: table.sectionId,
           sectionName: table.sectionName,
-          status: TableStatus.blank,
+          status: TableStatus.available,
           capacity: table.capacity,
           sortOrder: table.sortOrder,
         );
@@ -355,7 +353,7 @@ class TablesNotifier extends StateNotifier<TablesState> {
     final tables = state.tables.map((table) {
       if (table.id == tableId) {
         return table.copyWith(
-          status: TableStatus.locked,
+          status: TableStatus.blocked,
           lockedByUserId: userId,
           lockedByUserName: userName,
         );
@@ -368,7 +366,7 @@ class TablesNotifier extends StateNotifier<TablesState> {
 
   void unlockTable(String tableId) {
     final tables = state.tables.map((table) {
-      if (table.id == tableId && table.status == TableStatus.locked) {
+      if (table.id == tableId && table.status == TableStatus.blocked) {
         return table.copyWith(status: TableStatus.running);
       }
       return table;
@@ -394,8 +392,8 @@ class TablesNotifier extends StateNotifier<TablesState> {
       case 'TABLE_STATUS_UPDATED':
         final tableId = data['tableId'] as String;
         final status = TableStatus.values.firstWhere(
-          (e) => e.name == data['status'],
-          orElse: () => TableStatus.blank,
+              (e) => e.name == data['status'],
+          orElse: () => TableStatus.available,
         );
         updateTableStatus(tableId, status);
         break;

@@ -1,21 +1,22 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../../menu/data/models/menu_models.dart';
+import '../../../tables/data/models/table_details_model.dart';
 import '../../domain/entities/entities.dart';
 
 const _uuid = Uuid();
 
 // Current order provider (for the active table)
 final currentOrderProvider =
-    StateNotifierProvider<CurrentOrderNotifier, Order?>((ref) {
-      return CurrentOrderNotifier();
-    });
+StateNotifierProvider<CurrentOrderNotifier, Order?>((ref) {
+  return CurrentOrderNotifier();
+});
 
 // All orders provider
 final ordersProvider =
-    StateNotifierProvider<OrdersNotifier, Map<String, Order>>((ref) {
-      return OrdersNotifier();
-    });
+StateNotifierProvider<OrdersNotifier, Map<String, Order>>((ref) {
+  return OrdersNotifier();
+});
 
 // Order by table ID
 final orderByTableProvider = Provider.family<Order?, String>((ref, tableId) {
@@ -64,12 +65,119 @@ class CurrentOrderNotifier extends StateNotifier<Order?> {
     state = order;
   }
 
-  void addItem(
-    ApiMenuItem menuItem, {
-    ApiItemVariant? variant,
-    List<ApiItemAddon>? addons,
-    int quantity = 1,
+  /// Load order from API table details response
+  void loadOrderFromTableDetails({
+    required TableDetailsResponse tableDetails,
+    required String captainId,
+    required String captainName,
   }) {
+    final order = tableDetails.order;
+    if (order == null) return;
+
+    // Convert API items to OrderItems
+    final items = tableDetails.items.map((apiItem) {
+      // Determine status based on whether item has been sent to KOT
+      final status = _mapApiItemStatus(apiItem.status);
+
+      return OrderItem(
+        id: apiItem.id.toString(),
+        menuItemId: apiItem.itemId.toString(),
+        name: apiItem.displayName,
+        quantity: apiItem.quantity.toInt(),
+        unitPrice: apiItem.unitPrice,
+        variantId: apiItem.variantId?.toString(),
+        variantName: apiItem.variantName,
+        addons: apiItem.addons.map((a) => SelectedAddon(
+          id: a.id.toString(),
+          name: a.name,
+          price: a.price,
+        )).toList(),
+        specialInstructions: apiItem.specialInstructions,
+        status: status,
+        kotId: status != OrderItemStatus.pending ? 'kot-${apiItem.id}' : null,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+    }).toList();
+
+    state = Order(
+      id: order.id.toString(),
+      tableId: tableDetails.id.toString(),
+      tableName: tableDetails.tableNumber,
+      type: _mapOrderType(order.orderType),
+      captainId: captainId,
+      captainName: captainName,
+      guestCount: tableDetails.session?.guestCount ?? 1,
+      customerName: order.customerName,
+      customerPhone: order.customerPhone,
+      items: items,
+      subtotal: order.subtotal,
+      taxAmount: order.taxAmount,
+      discountAmount: order.discountAmount,
+      serviceCharge: order.serviceCharge,
+      grandTotal: order.totalAmount,
+      status: _mapOrderStatus(order.status),
+      createdAt: order.createdAt,
+      updatedAt: DateTime.now(),
+    );
+  }
+
+  OrderItemStatus _mapApiItemStatus(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return OrderItemStatus.pending;
+      case 'kot_generated':
+      case 'sent':
+        return OrderItemStatus.kotGenerated;
+      case 'preparing':
+      case 'accepted':
+        return OrderItemStatus.preparing;
+      case 'ready':
+        return OrderItemStatus.ready;
+      case 'served':
+        return OrderItemStatus.served;
+      case 'cancelled':
+        return OrderItemStatus.cancelled;
+      default:
+        return OrderItemStatus.kotGenerated; // Default to locked for safety
+    }
+  }
+
+  OrderType _mapOrderType(String type) {
+    switch (type.toLowerCase()) {
+      case 'dine_in':
+      case 'dinein':
+        return OrderType.dineIn;
+      case 'delivery':
+        return OrderType.delivery;
+      case 'pickup':
+      case 'pick_up':
+        return OrderType.pickUp;
+      default:
+        return OrderType.dineIn;
+    }
+  }
+
+  OrderStatus _mapOrderStatus(String status) {
+    switch (status.toLowerCase()) {
+      case 'active':
+      case 'running':
+        return OrderStatus.active;
+      case 'completed':
+        return OrderStatus.completed;
+      case 'cancelled':
+        return OrderStatus.cancelled;
+      default:
+        return OrderStatus.active;
+    }
+  }
+
+  void addItem(
+      ApiMenuItem menuItem, {
+        ApiItemVariant? variant,
+        List<ApiItemAddon>? addons,
+        int quantity = 1,
+      }) {
     if (state == null) return;
 
     final now = DateTime.now();
@@ -82,15 +190,15 @@ class CurrentOrderNotifier extends StateNotifier<Order?> {
       variantId: variant?.id.toString(),
       variantName: variant?.name,
       addons:
-          addons
-              ?.map(
-                (a) => SelectedAddon(
-                  id: a.id.toString(),
-                  name: a.name,
-                  price: a.price,
-                ),
-              )
-              .toList() ??
+      addons
+          ?.map(
+            (a) => SelectedAddon(
+          id: a.id.toString(),
+          name: a.name,
+          price: a.price,
+        ),
+      )
+          .toList() ??
           [],
       status: OrderItemStatus.pending,
       createdAt: now,

@@ -109,10 +109,10 @@ class _CaptainHomeScreenState extends ConsumerState<CaptainHomeScreen> {
             .take(5)
             .map(
               (item) => BottomNavigationBarItem(
-                icon: Icon(item.icon),
-                label: item.label,
-              ),
-            )
+            icon: Icon(item.icon),
+            label: item.label,
+          ),
+        )
             .toList(),
       ),
     );
@@ -514,7 +514,7 @@ class _OrdersListView extends ConsumerWidget {
 
     // Filter tables with active orders
     final activeTables = tables.where((t) {
-      if (t.status == TableStatus.blank) return false;
+      if (t.status == TableStatus.available) return false;
       if (filterType == 'delivery') return false; // TODO: Filter by order type
       if (filterType == 'pickup') return false;
       return true;
@@ -942,11 +942,11 @@ class _MenuManagementViewState extends ConsumerState<_MenuManagementView> {
                 children: (item.variants ?? [])
                     .map(
                       (v) => Chip(
-                        label: Text(
-                          '${v.name} - ₹${v.price.toStringAsFixed(0)}',
-                        ),
-                      ),
-                    )
+                    label: Text(
+                      '${v.name} - ₹${v.price.toStringAsFixed(0)}',
+                    ),
+                  ),
+                )
                     .toList(),
               ),
             ],
@@ -962,11 +962,11 @@ class _MenuManagementViewState extends ConsumerState<_MenuManagementView> {
                 children: (item.addons ?? [])
                     .map(
                       (a) => Chip(
-                        label: Text(
-                          '${a.name} +₹${a.price.toStringAsFixed(0)}',
-                        ),
-                      ),
-                    )
+                    label: Text(
+                      '${a.name} +₹${a.price.toStringAsFixed(0)}',
+                    ),
+                  ),
+                )
                     .toList(),
               ),
             ],

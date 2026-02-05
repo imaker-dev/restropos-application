@@ -21,6 +21,7 @@ class OrderScreen extends ConsumerStatefulWidget {
 
 class _OrderScreenState extends ConsumerState<OrderScreen> {
   final _searchController = TextEditingController();
+  bool _isCategorySidebarOpen = false;
 
   @override
   void initState() {
@@ -35,20 +36,31 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
 
       final table = ref.read(tableProvider(widget.tableId));
       final user = ref.read(currentUserProvider);
+      final tableDetails = ref.read(currentTableDetailsProvider);
       final existingOrder = ref.read(orderByTableProvider(widget.tableId));
 
-      if (existingOrder != null) {
+      // Priority: 1. API table details, 2. Local existing order, 3. Create new
+      if (tableDetails != null && tableDetails.hasActiveOrder && user != null) {
+        // Load order from API table details (existing order with items)
+        ref.read(currentOrderProvider.notifier).loadOrderFromTableDetails(
+          tableDetails: tableDetails,
+          captainId: user.id.toString(),
+          captainName: user.name,
+        );
+        // Clear the table details after loading
+        ref.read(currentTableDetailsProvider.notifier).state = null;
+      } else if (existingOrder != null) {
         ref.read(currentOrderProvider.notifier).loadOrder(existingOrder);
       } else if (table != null && user != null) {
         ref
             .read(currentOrderProvider.notifier)
             .createOrder(
-              tableId: table.id,
-              tableName: table.name,
-              captainId: user.id.toString(),
-              captainName: user.name,
-              guestCount: table.guestCount ?? 1,
-            );
+          tableId: table.id,
+          tableName: table.name,
+          captainId: user.id.toString(),
+          captainName: user.name,
+          guestCount: table.guestCount ?? 1,
+        );
       }
     });
   }
@@ -96,13 +108,13 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
     final kot = ref
         .read(kotsProvider.notifier)
         .createKot(
-          orderId: order.id,
-          tableId: order.tableId,
-          tableName: order.tableName,
-          items: pendingItems,
-          captainId: user.id.toString(),
-          captainName: user.name,
-        );
+      orderId: order.id,
+      tableId: order.tableId,
+      tableName: order.tableName,
+      items: pendingItems,
+      captainId: user.id.toString(),
+      captainName: user.name,
+    );
 
     ref
         .read(currentOrderProvider.notifier)
@@ -111,7 +123,7 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
     // Update table status
     ref
         .read(tablesProvider.notifier)
-        .updateTableStatus(widget.tableId, TableStatus.runningKot);
+        .updateTableStatus(widget.tableId, TableStatus.running);
 
     Toast.success(context, 'KOT #${kot.kotNumber} generated');
   }
@@ -283,6 +295,8 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
     final table = ref.watch(tableProvider(widget.tableId));
     final itemCount = order?.totalItems ?? 0;
     final total = order?.grandTotal ?? 0;
+    final kotItemCount = order?.items.where((i) => !i.canModify).length ?? 0;
+    final pendingItemCount = order?.pendingItems.length ?? 0;
 
     return Scaffold(
       appBar: AppBar(
@@ -298,7 +312,7 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: AppColors.primary,
+                color: table?.status.color ?? AppColors.primary,
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
@@ -351,31 +365,139 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
           ),
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          // Search bar - Compact
-          Container(
-            color: AppColors.surface,
-            padding: const EdgeInsets.fromLTRB(8, 4, 8, 6),
-            child: SearchInput(
-              controller: _searchController,
-              hint: 'Search menu...',
-              onChanged: (query) {
-                ref.read(menuSearchQueryProvider.notifier).state = query;
-              },
-            ),
+          // Main content
+          Column(
+            children: [
+              // Search bar with category toggle
+              Container(
+                color: AppColors.surface,
+                padding: const EdgeInsets.fromLTRB(8, 4, 8, 6),
+                child: Row(
+                  children: [
+                    // Category sidebar toggle
+                    Material(
+                      color: _isCategorySidebarOpen
+                          ? AppColors.primary
+                          : AppColors.scaffoldBackground,
+                      borderRadius: BorderRadius.circular(8),
+                      child: InkWell(
+                        onTap: () => setState(() {
+                          _isCategorySidebarOpen = !_isCategorySidebarOpen;
+                        }),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          child: Icon(
+                            _isCategorySidebarOpen ? Icons.close : Icons.menu,
+                            size: 20,
+                            color: _isCategorySidebarOpen
+                                ? Colors.white
+                                : AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: SearchInput(
+                        controller: _searchController,
+                        hint: 'Search menu...',
+                        onChanged: (query) {
+                          ref.read(menuSearchQueryProvider.notifier).state = query;
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Categories - Horizontal (shown when sidebar closed)
+              if (!_isCategorySidebarOpen)
+                const CategoryList(direction: Axis.horizontal),
+              // Menu grid
+              Expanded(child: _buildMenuGrid()),
+              // Order summary bar (shows KOT items count if any)
+              if (kotItemCount > 0 || pendingItemCount > 0)
+                _MobileOrderSummaryBar(
+                  kotItemCount: kotItemCount,
+                  pendingItemCount: pendingItemCount,
+                  total: total,
+                  onViewOrder: _showOrderSheet,
+                  onKot: pendingItemCount > 0 ? _onGenerateKot : null,
+                ),
+            ],
           ),
-          // Categories - Scrollable
-          const CategoryList(direction: Axis.horizontal),
-          // Menu grid
-          Expanded(child: _buildMenuGrid()),
-          // Bottom order bar
-          if (itemCount > 0)
-            _MobileOrderBar(
-              itemCount: itemCount,
-              total: total,
-              onViewOrder: _showOrderSheet,
-              onKot: order?.hasPendingItems == true ? _onGenerateKot : null,
+          // Collapsible category sidebar overlay
+          if (_isCategorySidebarOpen)
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              child: Container(
+                width: 160,
+                decoration: BoxDecoration(
+                  color: AppColors.secondary,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.2),
+                      blurRadius: 8,
+                      offset: const Offset(2, 0),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    // Sidebar header
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: const BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(color: Colors.white24),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.restaurant_menu,
+                              color: Colors.white, size: 20),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Categories',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const Spacer(),
+                          GestureDetector(
+                            onTap: () => setState(() {
+                              _isCategorySidebarOpen = false;
+                            }),
+                            child: const Icon(Icons.close,
+                                color: Colors.white70, size: 18),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Category list
+                    const Expanded(
+                      child: CategoryList(direction: Axis.vertical),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          // Overlay to close sidebar when tapping outside
+          if (_isCategorySidebarOpen)
+            Positioned.fill(
+              left: 160,
+              child: GestureDetector(
+                onTap: () => setState(() {
+                  _isCategorySidebarOpen = false;
+                }),
+                child: Container(color: Colors.black26),
+              ),
             ),
         ],
       ),
@@ -450,13 +572,13 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
                       ref
                           .read(currentOrderProvider.notifier)
                           .updateCustomerDetails(
-                            name: nameController.text.trim().isEmpty
-                                ? null
-                                : nameController.text.trim(),
-                            phone: phoneController.text.trim().isEmpty
-                                ? null
-                                : phoneController.text.trim(),
-                          );
+                        name: nameController.text.trim().isEmpty
+                            ? null
+                            : nameController.text.trim(),
+                        phone: phoneController.text.trim().isEmpty
+                            ? null
+                            : phoneController.text.trim(),
+                      );
                       Navigator.pop(ctx);
                     },
                     child: const Text('Save'),
@@ -602,7 +724,7 @@ class _VariantSelectorSheetState extends State<_VariantSelectorSheet> {
     final variants = widget.item.variants ?? [];
     if (variants.isNotEmpty) {
       _selectedVariant = variants.firstWhere(
-        (v) => v.isDefault,
+            (v) => v.isDefault,
         orElse: () => variants.first,
       );
     }
@@ -742,7 +864,7 @@ class _VariantSelectorSheetState extends State<_VariantSelectorSheet> {
                               final selectedInGroup = group.addons
                                   .where(
                                     (a) => _selectedAddonIds.contains(a.id),
-                                  )
+                              )
                                   .length;
                               if (selectedInGroup < group.maxSelection) {
                                 _selectedAddonIds.add(addon.id);
@@ -886,6 +1008,208 @@ class _MobileOrderBar extends StatelessWidget {
                   child: const Text(
                     'KOT',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Enhanced mobile order summary bar - Shows KOT items vs pending items
+class _MobileOrderSummaryBar extends StatelessWidget {
+  final int kotItemCount;
+  final int pendingItemCount;
+  final double total;
+  final VoidCallback onViewOrder;
+  final VoidCallback? onKot;
+
+  const _MobileOrderSummaryBar({
+    required this.kotItemCount,
+    required this.pendingItemCount,
+    required this.total,
+    required this.onViewOrder,
+    this.onKot,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final totalItems = kotItemCount + pendingItemCount;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              // Order summary with KOT/Pending breakdown
+              Expanded(
+                child: GestureDetector(
+                  onTap: onViewOrder,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.scaffoldBackground,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        // Item counts
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              children: [
+                                // Total items badge
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    '$totalItems items',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                // KOT sent indicator
+                                if (kotItemCount > 0)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.warning.withValues(alpha: 0.2),
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(
+                                        color: AppColors.warning,
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.lock,
+                                          size: 10,
+                                          color: AppColors.warning,
+                                        ),
+                                        const SizedBox(width: 2),
+                                        Text(
+                                          '$kotItemCount KOT',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.warning,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            // Pending items info
+                            if (pendingItemCount > 0)
+                              Text(
+                                '$pendingItemCount new items to send',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.success,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                          ],
+                        ),
+                        const Spacer(),
+                        // Total
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '₹${total.toStringAsFixed(0)}',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            const Text(
+                              'Total',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(
+                          Icons.chevron_right,
+                          color: AppColors.textSecondary,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // KOT Button - Only enabled if there are pending items
+              SizedBox(
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: onKot,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: onKot != null
+                        ? AppColors.success
+                        : AppColors.textHint,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        'KOT',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                      ),
+                      if (pendingItemCount > 0)
+                        Text(
+                          '($pendingItemCount)',
+                          style: const TextStyle(fontSize: 10),
+                        ),
+                    ],
                   ),
                 ),
               ),
