@@ -313,8 +313,8 @@ class OrderSummaryPanel extends ConsumerWidget {
             isSelected: order.type == OrderType.delivery,
           ),
           _OrderTypeTab(
-            label: 'Pick Up',
-            isSelected: order.type == OrderType.pickUp,
+            label: 'History',
+            isSelected: order.type == OrderType.history,
           ),
           _OrderTypeTab(
             label: 'KOT',

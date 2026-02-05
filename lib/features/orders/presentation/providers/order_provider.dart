@@ -150,9 +150,9 @@ class CurrentOrderNotifier extends StateNotifier<Order?> {
         return OrderType.dineIn;
       case 'delivery':
         return OrderType.delivery;
-      case 'pickup':
-      case 'pick_up':
-        return OrderType.pickUp;
+      case 'history':
+      case 'history':
+        return OrderType.history;
       default:
         return OrderType.dineIn;
     }

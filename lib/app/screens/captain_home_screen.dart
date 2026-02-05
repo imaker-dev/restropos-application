@@ -9,6 +9,7 @@ import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/menu/data/models/menu_models.dart';
 import '../../features/menu/menu.dart' hide MenuItemType;
 import '../../features/tables/tables.dart';
+import '../../features/profile/presentation/profile_screen.dart';
 
 class CaptainHomeScreen extends ConsumerStatefulWidget {
   const CaptainHomeScreen({super.key});
@@ -25,7 +26,7 @@ class _CaptainHomeScreenState extends ConsumerState<CaptainHomeScreen> {
     _NavItem(icon: Icons.receipt_long, label: 'Orders'),
     _NavItem(icon: Icons.grid_view, label: 'Menu'),
     _NavItem(icon: Icons.delivery_dining, label: 'Delivery'),
-    _NavItem(icon: Icons.shopping_bag, label: 'Pick Up'),
+    _NavItem(icon: Icons.history, label: 'History'),
     _NavItem(icon: Icons.history, label: 'History'),
   ];
 
@@ -149,47 +150,56 @@ class _CaptainHomeScreenState extends ConsumerState<CaptainHomeScreen> {
           const Divider(),
           // User info with connectivity
           if (user != null)
-            Padding(
-              padding: AppSpacing.paddingSm,
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                    child: Text(
-                      user.name[0].toUpperCase(),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
+            InkWell(
+              onTap: _navigateToProfile,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: AppSpacing.paddingSm,
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 18,
+                      backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                      child: Text(
+                        user.name[0].toUpperCase(),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          user.name,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            user.name,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          user.roles.isNotEmpty
-                              ? user.roles.first.name ?? 'Captain'
-                              : 'Captain',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textSecondary,
+                          Text(
+                            user.roles.isNotEmpty
+                                ? user.roles.first.name ?? 'Captain'
+                                : 'Captain',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                    const Icon(
+                      Icons.chevron_right,
+                      size: 16,
+                      color: AppColors.textSecondary,
+                    ),
+                  ],
+                ),
               ),
             ),
           // Connectivity indicator
@@ -292,7 +302,7 @@ class _CaptainHomeScreenState extends ConsumerState<CaptainHomeScreen> {
       case 3:
         return _buildDeliveryView();
       case 4:
-        return _buildPickUpView();
+        return _buildHistoryView();
       case 5:
         return _buildHistoryView();
       default:
@@ -321,24 +331,31 @@ class _CaptainHomeScreenState extends ConsumerState<CaptainHomeScreen> {
     );
   }
 
-  Widget _buildPickUpView() {
+  Widget _buildHistoryView() {
     return _OrdersListView(
-      filterType: 'pickup',
+      filterType: 'history',
       onOrderTap: (tableId) {
         context.goNamed('order', pathParameters: {'tableId': tableId});
       },
     );
   }
 
-  Widget _buildHistoryView() {
-    return const _OrderHistoryView();
-  }
+
 
   void _navigateToOrder() {
     final selectedTableId = ref.read(selectedTableProvider);
     if (selectedTableId != null) {
       context.goNamed('order', pathParameters: {'tableId': selectedTableId});
     }
+  }
+
+  void _navigateToProfile() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const ProfileScreen(),
+      ),
+    );
   }
 
   void _showUserMenu() {
@@ -374,6 +391,14 @@ class _CaptainHomeScreenState extends ConsumerState<CaptainHomeScreen> {
               style: const TextStyle(color: AppColors.textSecondary),
             ),
             const SizedBox(height: AppSpacing.lg),
+            ListTile(
+              leading: const Icon(Icons.person),
+              title: const Text('View Profile'),
+              onTap: () {
+                Navigator.pop(context);
+                _navigateToProfile();
+              },
+            ),
             ListTile(
               leading: const Icon(Icons.logout),
               title: const Text('Logout'),
@@ -516,7 +541,7 @@ class _OrdersListView extends ConsumerWidget {
     final activeTables = tables.where((t) {
       if (t.status == TableStatus.available) return false;
       if (filterType == 'delivery') return false; // TODO: Filter by order type
-      if (filterType == 'pickup') return false;
+      if (filterType == 'history') return false;
       return true;
     }).toList();
 
@@ -528,7 +553,7 @@ class _OrdersListView extends ConsumerWidget {
             Icon(
               filterType == 'delivery'
                   ? Icons.delivery_dining
-                  : filterType == 'pickup'
+                  : filterType == 'history'
                   ? Icons.shopping_bag
                   : Icons.receipt_long,
               size: 64,
@@ -538,8 +563,8 @@ class _OrdersListView extends ConsumerWidget {
             Text(
               filterType == 'delivery'
                   ? 'No delivery orders'
-                  : filterType == 'pickup'
-                  ? 'No pick up orders'
+                  : filterType == 'history'
+                  ? 'No order History'
                   : 'No active orders',
               style: const TextStyle(
                 fontSize: 16,
@@ -562,8 +587,8 @@ class _OrdersListView extends ConsumerWidget {
               Text(
                 filterType == 'delivery'
                     ? 'Delivery Orders'
-                    : filterType == 'pickup'
-                    ? 'Pick Up Orders'
+                    : filterType == 'history'
+                    ? ' History'
                     : 'Active Orders',
                 style: const TextStyle(
                   fontSize: 16,

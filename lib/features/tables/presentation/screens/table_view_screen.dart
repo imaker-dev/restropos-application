@@ -193,7 +193,7 @@ class TableViewScreen extends ConsumerWidget {
           ),
           const SizedBox(width: 4),
           _CompactButton(
-            label: 'Pick Up',
+            label: 'History',
             color: AppColors.secondary,
             onPressed: () {},
           ),

@@ -1,7 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'order_item.dart';
 
-enum OrderType { dineIn, delivery, pickUp }
+enum OrderType { dineIn, delivery, history }
 enum OrderStatus { active, completed, cancelled }
 
 class Order extends Equatable {
