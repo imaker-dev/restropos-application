@@ -1,21 +1,47 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/constants.dart';
-import '../../domain/entities/menu_item.dart';
+import '../../data/models/menu_models.dart';
 import '../providers/menu_provider.dart';
 
 class CategoryList extends ConsumerWidget {
   final Axis direction;
 
-  const CategoryList({
-    super.key,
-    this.direction = Axis.vertical,
-  });
+  const CategoryList({super.key, this.direction = Axis.vertical});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final categories = ref.watch(categoriesProvider);
+    final menuState = ref.watch(menuProvider);
+    final categories = menuState.categories;
     final selectedCategoryId = ref.watch(selectedCategoryProvider);
+
+    // Show loading indicator
+    if (menuState.isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: Colors.white),
+      );
+    }
+
+    // Show error if any
+    if (menuState.error != null) {
+      return Center(
+        child: Text(
+          menuState.error!,
+          style: const TextStyle(color: Colors.white70, fontSize: 12),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+
+    // Show message if no categories
+    if (categories.isEmpty) {
+      return const Center(
+        child: Text(
+          'No categories',
+          style: TextStyle(color: Colors.white70, fontSize: 12),
+        ),
+      );
+    }
 
     if (direction == Axis.horizontal) {
       return SizedBox(
@@ -32,7 +58,8 @@ class CategoryList extends ConsumerWidget {
               child: _CategoryChip(
                 category: category,
                 isSelected: isSelected,
-                onTap: () => ref.read(selectedCategoryProvider.notifier).state = category.id,
+                onTap: () => ref.read(selectedCategoryProvider.notifier).state =
+                    category.id,
               ),
             );
           },
@@ -51,7 +78,8 @@ class CategoryList extends ConsumerWidget {
           return _CategoryTile(
             category: category,
             isSelected: isSelected,
-            onTap: () => ref.read(selectedCategoryProvider.notifier).state = category.id,
+            onTap: () =>
+                ref.read(selectedCategoryProvider.notifier).state = category.id,
           );
         },
       ),
@@ -60,7 +88,7 @@ class CategoryList extends ConsumerWidget {
 }
 
 class _CategoryChip extends StatelessWidget {
-  final MenuCategory category;
+  final ApiCategory category;
   final bool isSelected;
   final VoidCallback onTap;
 
@@ -98,7 +126,7 @@ class _CategoryChip extends StatelessWidget {
 }
 
 class _CategoryTile extends StatelessWidget {
-  final MenuCategory category;
+  final ApiCategory category;
   final bool isSelected;
   final VoidCallback onTap;
 

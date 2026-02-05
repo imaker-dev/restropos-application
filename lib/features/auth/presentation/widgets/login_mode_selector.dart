@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/constants.dart';
-import '../../domain/entities/auth_state.dart';
+import '../providers/auth_state.dart';
 
 class LoginModeSelector extends StatelessWidget {
   final LoginMode currentMode;
@@ -35,6 +35,14 @@ class LoginModeSelector extends StatelessWidget {
             mode: LoginMode.credentials,
             isSelected: currentMode == LoginMode.credentials,
             onTap: () => onModeChanged(LoginMode.credentials),
+          ),
+          const Divider(height: 1),
+          _LoginModeItem(
+            icon: Icons.pin_outlined,
+            label: 'PIN',
+            mode: LoginMode.pin,
+            isSelected: currentMode == LoginMode.pin,
+            onTap: () => onModeChanged(LoginMode.pin),
           ),
           const Divider(height: 1),
           _LoginModeItem(
@@ -76,7 +84,9 @@ class _LoginModeItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: isSelected ? AppColors.primary.withValues(alpha: 0.1) : Colors.transparent,
+      color: isSelected
+          ? AppColors.primary.withValues(alpha: 0.1)
+          : Colors.transparent,
       child: InkWell(
         onTap: onTap,
         child: Container(
@@ -87,10 +97,7 @@ class _LoginModeItem extends StatelessWidget {
           decoration: BoxDecoration(
             border: isSelected
                 ? const Border(
-                    left: BorderSide(
-                      color: AppColors.primary,
-                      width: 3,
-                    ),
+                    left: BorderSide(color: AppColors.primary, width: 3),
                   )
                 : null,
           ),
@@ -107,7 +114,9 @@ class _LoginModeItem extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                  color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                  color: isSelected
+                      ? AppColors.primary
+                      : AppColors.textSecondary,
                 ),
               ),
             ],

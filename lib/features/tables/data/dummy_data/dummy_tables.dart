@@ -12,7 +12,7 @@ class DummyTables {
 
   static List<RestaurantTable> generateTables() {
     final List<RestaurantTable> tables = [];
-    
+
     // AC Tables (AC1 - AC20)
     for (int i = 1; i <= 20; i++) {
       tables.add(RestaurantTable(
@@ -36,7 +36,7 @@ class DummyTables {
         name: 'G$i',
         sectionId: 'section_garden',
         sectionName: 'Garden',
-        status: TableStatus.blank,
+        status: TableStatus.available,
         capacity: 4,
         sortOrder: i,
       ));
@@ -49,7 +49,7 @@ class DummyTables {
         name: 'NAC$i',
         sectionId: 'section_nonac',
         sectionName: 'Non AC',
-        status: TableStatus.blank,
+        status: TableStatus.available,
         capacity: 4,
         sortOrder: i,
       ));
@@ -62,7 +62,7 @@ class DummyTables {
         name: 'RF$i',
         sectionId: 'section_rooftop',
         sectionName: 'Rooftop',
-        status: TableStatus.blank,
+        status: TableStatus.available,
         capacity: i % 2 == 0 ? 6 : 4,
         sortOrder: 50 + i,
       ));
@@ -72,11 +72,11 @@ class DummyTables {
   }
 
   static TableStatus _getRandomStatus(int index) {
-    if (index == 4) return TableStatus.runningKot;
+    if (index == 4) return TableStatus.occupied;
     if (index == 7) return TableStatus.running;
-    if (index == 12) return TableStatus.printed;
-    if (index == 15) return TableStatus.paid;
-    return TableStatus.blank;
+    if (index == 12) return TableStatus.billing;
+    if (index == 15) return TableStatus.reserved;
+    return TableStatus.available;
   }
 
   static List<RestaurantTable> tables = generateTables();

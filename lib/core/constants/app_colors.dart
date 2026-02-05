@@ -36,12 +36,13 @@ class AppColors {
   static const Color info = Color(0xFF2196F3);
 
   // Table Status Colors
-  static const Color tableBlank = Color(0xFFE0E0E0);
-  static const Color tableRunning = Color(0xFF42A5F5);
-  static const Color tableRunningKot = Color(0xFFFFCA28);
-  static const Color tablePrinted = Color(0xFF66BB6A);
-  static const Color tablePaid = Color(0xFFFFB74D);
-  static const Color tableLocked = Color(0xFFEF5350);
+  static const Color tableAvailable = Color(0xFF4CAF50);  // Green - available for seating
+  static const Color tableOccupied = Color(0xFF42A5F5);   // Blue - guests seated, order in progress
+  static const Color tableRunning = Color(0xFF2196F3);    // Blue - order running with KOTs
+  static const Color tableBilling = Color(0xFFFF9800);    // Orange - bill generated, awaiting payment
+  static const Color tableCleaning = Color(0xFF9E9E9E);   // Grey - needs cleaning
+  static const Color tableBlocked = Color(0xFFEF5350);    // Red - blocked/unavailable
+  static const Color tableReserved = Color(0xFF9C27B0);   // Purple - reserved
 
   // Border & Divider
   static const Color border = Color(0xFFE0E0E0);

@@ -17,26 +17,11 @@ class TableCard extends StatelessWidget {
     this.onLongPress,
   });
 
-  Color get _statusColor {
-    switch (table.status) {
-      case TableStatus.blank:
-        return AppColors.tableBlank;
-      case TableStatus.running:
-        return AppColors.tableRunning;
-      case TableStatus.runningKot:
-        return AppColors.tableRunningKot;
-      case TableStatus.printed:
-        return AppColors.tablePrinted;
-      case TableStatus.paid:
-        return AppColors.tablePaid;
-      case TableStatus.locked:
-        return AppColors.tableLocked;
-    }
-  }
+  Color get _statusColor => table.status.color;
 
   Color get _borderColor {
     if (isSelected) return AppColors.primary;
-    if (table.status == TableStatus.blank) return AppColors.border;
+    if (table.status == TableStatus.available) return AppColors.border;
     return _statusColor;
   }
 
@@ -58,7 +43,7 @@ class TableCard extends StatelessWidget {
           child: AnimatedContainer(
             duration: AppConstants.shortAnimation,
             decoration: BoxDecoration(
-              color: table.status == TableStatus.blank
+              color: table.status == TableStatus.available
                   ? AppColors.surface
                   : _statusColor.withValues(alpha: 0.15),
               borderRadius: AppSpacing.borderRadiusSm,
@@ -68,18 +53,18 @@ class TableCard extends StatelessWidget {
               ),
               boxShadow: isSelected
                   ? [
-                      BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ]
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ]
                   : null,
             ),
             child: Stack(
               children: [
                 // Status indicator dot
-                if (table.status != TableStatus.blank)
+                if (table.status != TableStatus.available)
                   Positioned(
                     top: 6,
                     right: 6,
@@ -102,7 +87,7 @@ class TableCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: table.status == TableStatus.blank
+                          color: table.status == TableStatus.available
                               ? AppColors.textSecondary
                               : AppColors.textPrimary,
                         ),
@@ -122,7 +107,7 @@ class TableCard extends StatelessWidget {
                   ),
                 ),
                 // Lock indicator
-                if (table.status == TableStatus.locked)
+                if (table.status == TableStatus.blocked)
                   const Positioned(
                     bottom: 6,
                     right: 6,

@@ -3,53 +3,62 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 
 enum TableStatus {
-  blank,
+  available,
+  occupied,
   running,
-  runningKot,
-  printed,
-  paid,
-  locked,
+  billing,
+  cleaning,
+  blocked,
+  reserved,
 }
 
 extension TableStatusExtension on TableStatus {
   String get displayName {
     switch (this) {
-      case TableStatus.blank:
-        return 'Blank';
+      case TableStatus.available:
+        return 'Available';
+      case TableStatus.occupied:
+        return 'Occupied';
       case TableStatus.running:
         return 'Running';
-      case TableStatus.runningKot:
-        return 'Running KOT';
-      case TableStatus.printed:
-        return 'Printed';
-      case TableStatus.paid:
-        return 'Paid';
-      case TableStatus.locked:
-        return 'Locked';
+      case TableStatus.billing:
+        return 'Billing';
+      case TableStatus.cleaning:
+        return 'Cleaning';
+      case TableStatus.blocked:
+        return 'Blocked';
+      case TableStatus.reserved:
+        return 'Reserved';
     }
   }
 
   Color get color {
     switch (this) {
-      case TableStatus.blank:
-        return AppColors.tableBlank;
+      case TableStatus.available:
+        return AppColors.tableAvailable;
+      case TableStatus.occupied:
+        return AppColors.tableOccupied;
       case TableStatus.running:
         return AppColors.tableRunning;
-      case TableStatus.runningKot:
-        return AppColors.tableRunningKot;
-      case TableStatus.printed:
-        return AppColors.tablePrinted;
-      case TableStatus.paid:
-        return AppColors.tablePaid;
-      case TableStatus.locked:
-        return AppColors.textSecondary;
+      case TableStatus.billing:
+        return AppColors.tableBilling;
+      case TableStatus.cleaning:
+        return AppColors.tableCleaning;
+      case TableStatus.blocked:
+        return AppColors.tableBlocked;
+      case TableStatus.reserved:
+        return AppColors.tableReserved;
     }
   }
 
-  bool get canTakeOrder => this == TableStatus.blank || this == TableStatus.running || this == TableStatus.runningKot;
-  bool get hasOrder => this != TableStatus.blank;
-  bool get canPrint => this == TableStatus.running || this == TableStatus.runningKot;
-  bool get canPay => this == TableStatus.printed;
+  bool get canTakeOrder => this == TableStatus.available || this == TableStatus.running || this == TableStatus.occupied;
+  bool get hasOrder => this != TableStatus.available && this != TableStatus.cleaning && this != TableStatus.blocked;
+  bool get canPrint => this == TableStatus.running || this == TableStatus.occupied;
+  bool get canPay => this == TableStatus.billing;
+  bool get isAvailableForSeating => this == TableStatus.available;
+  bool get needsCleaning => this == TableStatus.cleaning;
+  bool get isBlocked => this == TableStatus.blocked;
+  bool get isReserved => this == TableStatus.reserved;
 }
 
 class TableSection extends Equatable {
@@ -103,7 +112,7 @@ class RestaurantTable extends Equatable {
     required this.name,
     required this.sectionId,
     required this.sectionName,
-    this.status = TableStatus.blank,
+    this.status = TableStatus.available,
     this.capacity = 4,
     this.currentOrderId,
     this.lockedByUserId,
@@ -114,9 +123,9 @@ class RestaurantTable extends Equatable {
     this.sortOrder = 0,
   });
 
-  bool get isAvailable => status == TableStatus.blank;
-  bool get isOccupied => status != TableStatus.blank;
-  bool get isLocked => status == TableStatus.locked;
+  bool get isAvailable => status == TableStatus.available;
+  bool get isOccupied => status != TableStatus.available;
+  bool get isLocked => status == TableStatus.blocked;
 
   RestaurantTable copyWith({
     String? id,
@@ -172,8 +181,8 @@ class RestaurantTable extends Equatable {
     sectionId: json['sectionId'] as String,
     sectionName: json['sectionName'] as String,
     status: TableStatus.values.firstWhere(
-      (e) => e.name == json['status'],
-      orElse: () => TableStatus.blank,
+          (e) => e.name == json['status'],
+      orElse: () => TableStatus.available,
     ),
     capacity: json['capacity'] as int? ?? 4,
     currentOrderId: json['currentOrderId'] as String?,

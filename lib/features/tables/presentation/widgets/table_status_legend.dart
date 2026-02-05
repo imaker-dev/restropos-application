@@ -24,29 +24,39 @@ class TableStatusLegend extends StatelessWidget {
       runSpacing: AppSpacing.xs,
       children: [
         _LegendItem(
-          color: AppColors.tableBlank,
-          label: 'Blank Table',
-          count: _getCount(TableStatus.blank),
+          color: AppColors.tableAvailable,
+          label: 'Available',
+          count: _getCount(TableStatus.available),
+        ),
+        _LegendItem(
+          color: AppColors.tableOccupied,
+          label: 'Occupied',
+          count: _getCount(TableStatus.occupied),
         ),
         _LegendItem(
           color: AppColors.tableRunning,
-          label: 'Running Table',
+          label: 'Running',
           count: _getCount(TableStatus.running),
         ),
         _LegendItem(
-          color: AppColors.tablePrinted,
-          label: 'Printed Table',
-          count: _getCount(TableStatus.printed),
+          color: AppColors.tableBilling,
+          label: 'Billing',
+          count: _getCount(TableStatus.billing),
         ),
         _LegendItem(
-          color: AppColors.tablePaid,
-          label: 'Paid Table',
-          count: _getCount(TableStatus.paid),
+          color: AppColors.tableCleaning,
+          label: 'Cleaning',
+          count: _getCount(TableStatus.cleaning),
         ),
         _LegendItem(
-          color: AppColors.tableRunningKot,
-          label: 'Running KOT Table',
-          count: _getCount(TableStatus.runningKot),
+          color: AppColors.tableBlocked,
+          label: 'Blocked',
+          count: _getCount(TableStatus.blocked),
+        ),
+        _LegendItem(
+          color: AppColors.tableReserved,
+          label: 'Reserved',
+          count: _getCount(TableStatus.reserved),
         ),
       ],
     );

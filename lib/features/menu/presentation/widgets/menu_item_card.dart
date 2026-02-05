@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/constants/constants.dart';
-import '../../domain/entities/menu_item.dart';
+import '../../data/models/menu_models.dart';
 
 class MenuItemCard extends StatelessWidget {
-  final MenuItem item;
+  final ApiMenuItem item;
   final VoidCallback? onTap;
   final bool showPrice;
 
@@ -59,7 +59,10 @@ class MenuItemCard extends StatelessWidget {
                       height: 14,
                       margin: const EdgeInsets.only(top: 2, right: 6),
                       decoration: BoxDecoration(
-                        border: Border.all(color: _typeIndicatorColor, width: 1.5),
+                        border: Border.all(
+                          color: _typeIndicatorColor,
+                          width: 1.5,
+                        ),
                         borderRadius: BorderRadius.circular(3),
                       ),
                       child: Center(
@@ -93,7 +96,6 @@ class MenuItemCard extends StatelessWidget {
                 if (showPrice) ...[
                   const Spacer(),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
                         '₹${item.price.toStringAsFixed(0)}',
@@ -105,12 +107,15 @@ class MenuItemCard extends StatelessWidget {
                               : AppColors.textHint,
                         ),
                       ),
+                      const Spacer(),
+                      // Tags row
                       if (item.hasVariants)
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 4,
                             vertical: 2,
                           ),
+                          margin: const EdgeInsets.only(left: 4),
                           decoration: BoxDecoration(
                             color: AppColors.info.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(4),
@@ -120,6 +125,25 @@ class MenuItemCard extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 9,
                               color: AppColors.info,
+                            ),
+                          ),
+                        ),
+                      if (item.hasAddons)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 2,
+                          ),
+                          margin: const EdgeInsets.only(left: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.warning.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'Add-ons',
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: AppColors.warning,
                             ),
                           ),
                         ),
@@ -139,10 +163,7 @@ class MenuItemCard extends StatelessWidget {
                     ),
                     child: const Text(
                       'Not Available',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: AppColors.error,
-                      ),
+                      style: TextStyle(fontSize: 10, color: AppColors.error),
                     ),
                   ),
               ],
