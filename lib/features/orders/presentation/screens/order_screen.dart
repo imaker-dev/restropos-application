@@ -84,15 +84,17 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
   void _showVariantSelector(ApiMenuItem item) {
     showModalBottomSheet(
       context: context,
-      builder: (context) => _VariantSelectorSheet(
-        item: item,
-        onSelect: (variant, addons) {
-          ref
-              .read(currentOrderProvider.notifier)
-              .addItem(item, variant: variant, addons: addons);
-          Navigator.pop(context);
-          Toast.success(context, '${item.name} added');
-        },
+      builder: (context) => SingleChildScrollView(
+        child: _VariantSelectorSheet(
+          item: item,
+          onSelect: (variant, addons) {
+            ref
+                .read(currentOrderProvider.notifier)
+                .addItem(item, variant: variant, addons: addons);
+            Navigator.pop(context);
+            Toast.success(context, '${item.name} added');
+          },
+        ),
       ),
     );
   }
@@ -889,131 +891,6 @@ class _VariantSelectorSheetState extends State<_VariantSelectorSheet> {
             fullWidth: true,
           ),
         ],
-      ),
-    );
-  }
-}
-
-// Mobile bottom order bar - Shows item count, total, and quick actions
-class _MobileOrderBar extends StatelessWidget {
-  final int itemCount;
-  final double total;
-  final VoidCallback onViewOrder;
-  final VoidCallback? onKot;
-
-  const _MobileOrderBar({
-    required this.itemCount,
-    required this.total,
-    required this.onViewOrder,
-    this.onKot,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            children: [
-              // Order summary
-              Expanded(
-                child: GestureDetector(
-                  onTap: onViewOrder,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.scaffoldBackground,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            '$itemCount',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text(
-                              'View Order',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                            Text(
-                              '₹${total.toStringAsFixed(0)}',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const Spacer(),
-                        const Icon(
-                          Icons.chevron_right,
-                          color: AppColors.textSecondary,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              // KOT Button - Large and prominent
-              SizedBox(
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: onKot,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: onKot != null
-                        ? AppColors.success
-                        : AppColors.textHint,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: const Text(
-                    'KOT',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

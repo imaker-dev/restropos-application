@@ -76,28 +76,31 @@ class LayoutRepository {
   Future<ApiResult<TableDetailsResponse>> getTableDetails(int tableId) async {
     return _api.get(
       ApiEndpoints.tableById(tableId),
-      parser: (json) => TableDetailsResponse.fromJson(json as Map<String, dynamic>),
+      parser: (json) =>
+          TableDetailsResponse.fromJson(json as Map<String, dynamic>),
     );
   }
 
   /// Start table session
-  Future<ApiResult<TableSession>> startSession({
+  /// POST /tables/{tableId}/session
+  Future<ApiResult<StartSessionResponse>> startSession({
     required int tableId,
-    required int covers,
-    String? customerName,
-    String? customerPhone,
+    required int guestCount,
+    String? guestName,
+    String? guestPhone,
     String? notes,
   }) async {
     final request = StartSessionRequest(
-      covers: covers,
-      customerName: customerName,
-      customerPhone: customerPhone,
+      guestCount: guestCount,
+      guestName: guestName,
+      guestPhone: guestPhone,
       notes: notes,
     );
     return _api.post(
       ApiEndpoints.tableSession(tableId),
       data: request.toJson(),
-      parser: (json) => TableSession.fromJson(json as Map<String, dynamic>),
+      parser: (json) =>
+          StartSessionResponse.fromJson(json as Map<String, dynamic>),
     );
   }
 
