@@ -204,11 +204,15 @@ class ApiTable {
     final tableNum =
         json['table_number'] as String? ?? json['tableNumber'] as String?;
 
+    // Treat empty or null status as 'available'
+    final rawStatus = json['status'] as String? ?? '';
+    final status = rawStatus.trim().isEmpty ? 'available' : rawStatus;
+
     return ApiTable(
       id: json['id'] as int? ?? 0,
       tableNumber: tableNum,
       name: json['name'] as String? ?? tableNum ?? '',
-      status: json['status'] as String? ?? 'available',
+      status: status,
       capacity: json['capacity'] as int?,
       floorId: json['floor_id'] as int? ?? json['floorId'] as int?,
       sectionId: json['section_id'] as int? ?? json['sectionId'] as int?,
@@ -223,13 +227,22 @@ class ApiTable {
           (json['orderTotal'] as num?)?.toDouble(),
       kotPending: json['kot_pending'] as int? ?? json['kotPending'] as int?,
       runningTotal: (json['runningTotal'] as num?)?.toDouble(),
-      guestCount: json['guestCount'] as int? ?? json['current_covers'] as int?,
+      guestCount:
+          json['guest_count'] as int? ??
+          json['guestCount'] as int? ??
+          json['current_covers'] as int?,
       customerName:
-          json['customerName'] as String? ?? json['customer_name'] as String?,
+          json['guest_name'] as String? ??
+          json['customerName'] as String? ??
+          json['customer_name'] as String?,
       customerPhone:
-          json['customerPhone'] as String? ?? json['customer_phone'] as String?,
+          json['guest_phone'] as String? ??
+          json['customerPhone'] as String? ??
+          json['customer_phone'] as String?,
       notes: json['notes'] as String?,
-      sessionStart: json['session_start'] != null
+      sessionStart: json['started_at'] != null
+          ? DateTime.tryParse(json['started_at'] as String)
+          : json['session_start'] != null
           ? DateTime.tryParse(json['session_start'] as String)
           : json['sessionStart'] != null
           ? DateTime.tryParse(json['sessionStart'] as String)
@@ -280,24 +293,39 @@ class ApiTable {
 }
 
 class StartSessionRequest {
-  final int covers;
-  final String? customerName;
-  final String? customerPhone;
+  final int guestCount;
+  final String? guestName;
+  final String? guestPhone;
   final String? notes;
 
   const StartSessionRequest({
-    required this.covers,
-    this.customerName,
-    this.customerPhone,
+    required this.guestCount,
+    this.guestName,
+    this.guestPhone,
     this.notes,
   });
 
   Map<String, dynamic> toJson() => {
-    'covers': covers,
-    if (customerName != null) 'customerName': customerName,
-    if (customerPhone != null) 'customerPhone': customerPhone,
+    'guestCount': guestCount,
+    if (guestName != null) 'guestName': guestName,
+    if (guestPhone != null) 'guestPhone': guestPhone,
     if (notes != null) 'notes': notes,
   };
+}
+
+/// Response from POST /tables/{tableId}/session
+class StartSessionResponse {
+  final int sessionId;
+  final ApiTable table;
+
+  const StartSessionResponse({required this.sessionId, required this.table});
+
+  factory StartSessionResponse.fromJson(Map<String, dynamic> json) {
+    return StartSessionResponse(
+      sessionId: json['sessionId'] as int? ?? 0,
+      table: ApiTable.fromJson(json['table'] as Map<String, dynamic>),
+    );
+  }
 }
 
 class TableSession {

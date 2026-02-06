@@ -1,4 +1,7 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/network/websocket_service.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../layout/data/models/layout_models.dart';
 import '../../../layout/data/repositories/layout_repository.dart';
@@ -56,8 +59,8 @@ final sectionsProvider = Provider<List<TableSection>>((ref) {
   return sectionMap.entries
       .map(
         (entry) =>
-        TableSection(id: entry.key, name: entry.value, floorId: floorIdStr),
-  )
+            TableSection(id: entry.key, name: entry.value, floorId: floorIdStr),
+      )
       .toList();
 });
 
@@ -73,10 +76,48 @@ final selectedStatusFilterProvider = StateProvider<TableStatus?>((ref) {
 
 // Tables provider with optimistic updates
 final tablesProvider = StateNotifierProvider<TablesNotifier, TablesState>((
-    ref,
-    ) {
+  ref,
+) {
   final repository = ref.watch(layoutRepositoryProvider);
-  return TablesNotifier(repository);
+  final notifier = TablesNotifier(repository, ref);
+
+  // Subscribe to WebSocket table updates
+  final tableSubscription = ref.listen<AsyncValue<Map<String, dynamic>>>(
+    tableUpdatesProvider,
+    (previous, next) {
+      next.whenData((data) {
+        notifier.handleWebSocketTableUpdate(data);
+      });
+    },
+  );
+
+  // Subscribe to WebSocket order updates
+  final orderSubscription = ref.listen<AsyncValue<Map<String, dynamic>>>(
+    orderUpdatesProvider,
+    (previous, next) {
+      next.whenData((data) {
+        notifier.handleOrderUpdate(data);
+      });
+    },
+  );
+
+  // Subscribe to WebSocket bill status updates
+  final billSubscription = ref.listen<AsyncValue<Map<String, dynamic>>>(
+    billStatusProvider,
+    (previous, next) {
+      next.whenData((data) {
+        notifier.handleBillStatusUpdate(data);
+      });
+    },
+  );
+
+  ref.onDispose(() {
+    tableSubscription.close();
+    orderSubscription.close();
+    billSubscription.close();
+  });
+
+  return notifier;
 });
 
 // Filtered tables by section
@@ -95,32 +136,32 @@ final filteredTablesProvider = Provider<List<RestaurantTable>>((ref) {
 
 // Tables grouped by section with optional status filter
 final tablesGroupedBySectionProvider =
-Provider<Map<String, List<RestaurantTable>>>((ref) {
-  final tables = ref.watch(tablesProvider).tables;
-  final sections = ref.watch(sectionsProvider);
-  final statusFilter = ref.watch(selectedStatusFilterProvider);
+    Provider<Map<String, List<RestaurantTable>>>((ref) {
+      final tables = ref.watch(tablesProvider).tables;
+      final sections = ref.watch(sectionsProvider);
+      final statusFilter = ref.watch(selectedStatusFilterProvider);
 
-  final Map<String, List<RestaurantTable>> grouped = {};
+      final Map<String, List<RestaurantTable>> grouped = {};
 
-  for (final section in sections) {
-    var sectionTables = tables.where((t) => t.sectionId == section.id);
+      for (final section in sections) {
+        var sectionTables = tables.where((t) => t.sectionId == section.id);
 
-    // Apply status filter if selected
-    if (statusFilter != null) {
-      sectionTables = sectionTables.where((t) => t.status == statusFilter);
-    }
+        // Apply status filter if selected
+        if (statusFilter != null) {
+          sectionTables = sectionTables.where((t) => t.status == statusFilter);
+        }
 
-    final tablesList = sectionTables.toList()
-      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+        final tablesList = sectionTables.toList()
+          ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
 
-    // Only include sections that have tables after filtering
-    if (tablesList.isNotEmpty) {
-      grouped[section.name] = tablesList;
-    }
-  }
+        // Only include sections that have tables after filtering
+        if (tablesList.isNotEmpty) {
+          grouped[section.name] = tablesList;
+        }
+      }
 
-  return grouped;
-});
+      return grouped;
+    });
 
 // Single table provider for optimized rebuilds
 final tableProvider = Provider.family<RestaurantTable?, String>((ref, tableId) {
@@ -183,8 +224,9 @@ class TablesState {
 
 class TablesNotifier extends StateNotifier<TablesState> {
   final LayoutRepository? _repository;
+  final Ref? _ref;
 
-  TablesNotifier([this._repository]) : super(TablesState.initial());
+  TablesNotifier([this._repository, this._ref]) : super(TablesState.initial());
 
   /// Load tables from floor details API (includes tables in response)
   Future<void> loadTablesByFloorDetails(int floorId) async {
@@ -315,18 +357,78 @@ class TablesNotifier extends StateNotifier<TablesState> {
     state = state.copyWith(tables: tables);
   }
 
-  void openTable(String tableId, {int? guestCount}) {
+  /// Start table session via API
+  /// POST /tables/{tableId}/session
+  Future<bool> openTable(
+    String tableId, {
+    required int guestCount,
+    String? guestName,
+    String? guestPhone,
+    String? notes,
+  }) async {
+    if (_repository == null) {
+      // Fallback: update local state only
+      _updateTableStatusLocally(tableId, TableStatus.occupied, guestCount);
+      return true;
+    }
+
+    final tableIdInt = int.tryParse(tableId);
+    if (tableIdInt == null) {
+      debugPrint('[TablesNotifier] Invalid tableId: $tableId');
+      return false;
+    }
+
+    debugPrint(
+      '[TablesNotifier] Starting session for table $tableId with $guestCount guests',
+    );
+
+    final result = await _repository.startSession(
+      tableId: tableIdInt,
+      guestCount: guestCount,
+      guestName: guestName,
+      guestPhone: guestPhone,
+      notes: notes,
+    );
+
+    return result.when(
+      success: (response, _) {
+        debugPrint(
+          '[TablesNotifier] Session started: sessionId=${response.sessionId}',
+        );
+        // Update local state with response data
+        final updatedTable = _mapApiTableToEntity(response.table);
+        final tables = state.tables.map((table) {
+          if (table.id == tableId) {
+            return updatedTable;
+          }
+          return table;
+        }).toList();
+        state = state.copyWith(tables: tables);
+        return true;
+      },
+      failure: (message, _, __) {
+        debugPrint('[TablesNotifier] Failed to start session: $message');
+        state = state.copyWith(error: message);
+        return false;
+      },
+    );
+  }
+
+  void _updateTableStatusLocally(
+    String tableId,
+    TableStatus status,
+    int? guestCount,
+  ) {
     final tables = state.tables.map((table) {
       if (table.id == tableId) {
         return table.copyWith(
-          status: TableStatus.running,
+          status: status,
           orderStartedAt: DateTime.now(),
           guestCount: guestCount ?? 1,
         );
       }
       return table;
     }).toList();
-
     state = state.copyWith(tables: tables);
   }
 
@@ -386,13 +488,237 @@ class TablesNotifier extends StateNotifier<TablesState> {
     state = state.copyWith(tables: tables);
   }
 
-  // Handle WebSocket event
+  /// Handle WebSocket table update from stream
+  /// Handles multiple payload formats:
+  /// Format 1: { tableId, floorId, outletId, event, sessionId, captain } - event-based
+  /// Format 2: { tableId, status, session, orderId } - status-based
+  /// Format 3: { tableId, tableNumber, oldStatus, newStatus } - legacy
+  /// Format 4: { _polling: true, floorId } - polling fallback trigger
+  void handleWebSocketTableUpdate(Map<String, dynamic> data) {
+    // Check if this is a polling fallback trigger
+    if (data['_polling'] == true) {
+      debugPrint('[TablesNotifier] Polling fallback: refreshing tables');
+      refresh();
+      return;
+    }
+
+    final tableId = data['tableId']?.toString();
+    final event = data['event'] as String?;
+    final session = data['session'] as Map<String, dynamic>?;
+
+    // Handle different status field names
+    String? newStatus = data['status'] as String?;
+    newStatus ??= data['newStatus'] as String?;
+
+    // Map event type to status if no direct status provided
+    if (newStatus == null && event != null) {
+      newStatus = _mapEventToStatus(event);
+    }
+
+    debugPrint(
+      '[TablesNotifier] handleWebSocketTableUpdate: tableId=$tableId, event=$event, status=$newStatus',
+    );
+
+    if (tableId == null) {
+      debugPrint('[TablesNotifier] Invalid data: tableId is null');
+      return;
+    }
+
+    // If still no status, skip update
+    if (newStatus == null) {
+      debugPrint('[TablesNotifier] No status could be determined, skipping');
+      return;
+    }
+
+    final status = _mapApiStatusToTableStatus(newStatus);
+    bool found = false;
+
+    final tables = state.tables.map((table) {
+      if (table.id == tableId) {
+        found = true;
+        debugPrint(
+          '[TablesNotifier] Updating table ${table.name} from ${table.status} to $status',
+        );
+
+        // Build updated table with all available data
+        return table.copyWith(
+          status: status,
+          guestCount:
+              session?['guestCount'] as int? ?? session?['guest_count'] as int?,
+          orderStartedAt:
+              (event == 'session_started' || status == TableStatus.occupied)
+              ? DateTime.now()
+              : table.orderStartedAt,
+        );
+      }
+      return table;
+    }).toList();
+
+    if (!found) {
+      debugPrint(
+        '[TablesNotifier] Table $tableId not found in current state (${state.tables.length} tables)',
+      );
+    } else {
+      state = state.copyWith(tables: tables);
+    }
+  }
+
+  /// Map WebSocket event type to table status
+  /// Only handles table:updated events
+  String? _mapEventToStatus(String event) {
+    switch (event.toLowerCase()) {
+      case 'session_started':
+        return 'occupied';
+      case 'session_ended':
+        return 'available';
+      case 'tables_merged':
+        return 'occupied';
+      case 'tables_unmerged':
+        return 'available';
+      case 'status_changed':
+        // status_changed event should have a separate status field
+        return null;
+      default:
+        debugPrint('[TablesNotifier] Unknown table:updated event: $event');
+        return null;
+    }
+  }
+
+  /// Map order:updated type to table status
+  String? _mapOrderTypeToStatus(String type) {
+    switch (type.toLowerCase()) {
+      case 'order:created':
+      case 'order:items_added':
+      case 'order:kot_sent':
+      case 'order:item_ready':
+      case 'order:all_ready':
+      case 'order:all_served':
+        return 'running';
+      case 'order:billed':
+        return 'billing';
+      case 'order:payment_received':
+      case 'order:cancelled':
+      case 'order:transferred':
+        return 'available';
+      default:
+        debugPrint('[TablesNotifier] Unknown order type: $type');
+        return null;
+    }
+  }
+
+  /// Map bill:status to table status
+  String? _mapBillStatusToTableStatus(String billStatus) {
+    switch (billStatus.toLowerCase()) {
+      case 'pending':
+        return 'billing';
+      case 'paid':
+        return 'available';
+      default:
+        debugPrint('[TablesNotifier] Unknown bill status: $billStatus');
+        return null;
+    }
+  }
+
+  /// Handle order:updated WebSocket event
+  /// Payload: { type, outletId, orderId, tableId, status }
+  void handleOrderUpdate(Map<String, dynamic> data) {
+    final tableId = data['tableId']?.toString();
+    final type = data['type'] as String?;
+
+    debugPrint(
+      '[TablesNotifier] handleOrderUpdate: tableId=$tableId, type=$type',
+    );
+
+    if (tableId == null || type == null) {
+      debugPrint(
+        '[TablesNotifier] Invalid order update: missing tableId or type',
+      );
+      return;
+    }
+
+    final status = _mapOrderTypeToStatus(type);
+    if (status == null) {
+      return;
+    }
+
+    final tableStatus = _mapApiStatusToTableStatus(status);
+    bool found = false;
+
+    final tables = state.tables.map((table) {
+      if (table.id == tableId) {
+        found = true;
+        debugPrint(
+          '[TablesNotifier] Updating table ${table.name} from ${table.status} to $tableStatus (order: $type)',
+        );
+        return table.copyWith(status: tableStatus);
+      }
+      return table;
+    }).toList();
+
+    if (!found) {
+      debugPrint('[TablesNotifier] Table $tableId not found in state');
+    } else {
+      state = state.copyWith(tables: tables);
+    }
+  }
+
+  /// Handle bill:status WebSocket event
+  /// Payload: { outletId, orderId, tableId, status, grandTotal }
+  void handleBillStatusUpdate(Map<String, dynamic> data) {
+    final tableId = data['tableId']?.toString();
+    final billStatus = data['status'] as String?;
+
+    debugPrint(
+      '[TablesNotifier] handleBillStatusUpdate: tableId=$tableId, billStatus=$billStatus',
+    );
+
+    if (tableId == null || billStatus == null) {
+      debugPrint(
+        '[TablesNotifier] Invalid bill status: missing tableId or status',
+      );
+      return;
+    }
+
+    final status = _mapBillStatusToTableStatus(billStatus);
+    if (status == null) {
+      return;
+    }
+
+    final tableStatus = _mapApiStatusToTableStatus(status);
+    bool found = false;
+
+    final tables = state.tables.map((table) {
+      if (table.id == tableId) {
+        found = true;
+        debugPrint(
+          '[TablesNotifier] Updating table ${table.name} from ${table.status} to $tableStatus (bill: $billStatus)',
+        );
+        return table.copyWith(status: tableStatus);
+      }
+      return table;
+    }).toList();
+
+    if (!found) {
+      debugPrint('[TablesNotifier] Table $tableId not found in state');
+    } else {
+      state = state.copyWith(tables: tables);
+    }
+  }
+
+  /// Handle table:updated WebSocket event (legacy format)
+  /// Payload: { tableId, tableNumber, oldStatus, newStatus, changedBy, timestamp }
+  void handleTableUpdatedEvent(Map<String, dynamic> data) {
+    // Delegate to new handler
+    handleWebSocketTableUpdate(data);
+  }
+
+  // Handle WebSocket event (legacy)
   void handleTableEvent(String event, Map<String, dynamic> data) {
     switch (event) {
       case 'TABLE_STATUS_UPDATED':
         final tableId = data['tableId'] as String;
         final status = TableStatus.values.firstWhere(
-              (e) => e.name == data['status'],
+          (e) => e.name == data['status'],
           orElse: () => TableStatus.available,
         );
         updateTableStatus(tableId, status);

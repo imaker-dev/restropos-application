@@ -119,18 +119,18 @@ class TablesNotifier extends StateNotifier<TablesState> {
     state = state.copyWith(selectedSectionId: sectionId);
   }
 
-  Future<ApiResult<TableSession>> startSession({
+  Future<ApiResult<StartSessionResponse>> startSession({
     required int tableId,
-    required int covers,
-    String? customerName,
-    String? customerPhone,
+    required int guestCount,
+    String? guestName,
+    String? guestPhone,
     String? notes,
   }) async {
     final result = await _repository.startSession(
       tableId: tableId,
-      covers: covers,
-      customerName: customerName,
-      customerPhone: customerPhone,
+      guestCount: guestCount,
+      guestName: guestName,
+      guestPhone: guestPhone,
       notes: notes,
     );
 

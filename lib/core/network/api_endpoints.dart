@@ -2,7 +2,7 @@ class ApiEndpoints {
   ApiEndpoints._();
 
   static const String baseUrl =
-      "https://sequences-diana-wholesale-adds.trycloudflare.com/api/v1";
+      "https://carmen-herb-shareware-commented.trycloudflare.com/api/v1";
 
   // Default outlet ID
   static const int defaultOutletId = 4;

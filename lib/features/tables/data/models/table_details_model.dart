@@ -66,7 +66,9 @@ class TableDetailsResponse {
           ? TablePosition.fromJson(json['position'] as Map<String, dynamic>)
           : const TablePosition(),
       session: json['session'] != null
-          ? TableSessionDetails.fromJson(json['session'] as Map<String, dynamic>)
+          ? TableSessionDetails.fromJson(
+              json['session'] as Map<String, dynamic>,
+            )
           : null,
       captain: json['captain'] != null
           ? TableCaptain.fromJson(json['captain'] as Map<String, dynamic>)
@@ -74,27 +76,35 @@ class TableDetailsResponse {
       order: json['order'] != null
           ? TableOrderDetails.fromJson(json['order'] as Map<String, dynamic>)
           : null,
-      items: (json['items'] as List?)
-          ?.map((e) => TableOrderItem.fromJson(e as Map<String, dynamic>))
-          .toList() ??
+      items:
+          (json['items'] as List?)
+              ?.map((e) => TableOrderItem.fromJson(e as Map<String, dynamic>))
+              .toList() ??
           [],
-      kots: (json['kots'] as List?)
-          ?.map((e) => TableKot.fromJson(e as Map<String, dynamic>))
-          .toList() ??
+      kots:
+          (json['kots'] as List?)
+              ?.map((e) => TableKot.fromJson(e as Map<String, dynamic>))
+              .toList() ??
           [],
       billing: json['billing'] != null
           ? TableBilling.fromJson(json['billing'] as Map<String, dynamic>)
           : null,
-      timeline: (json['timeline'] as List?)
-          ?.map((e) => TableTimelineEvent.fromJson(e as Map<String, dynamic>))
-          .toList() ??
+      timeline:
+          (json['timeline'] as List?)
+              ?.map(
+                (e) => TableTimelineEvent.fromJson(e as Map<String, dynamic>),
+              )
+              .toList() ??
           [],
-      mergedTables: (json['mergedTables'] as List?)
-          ?.map((e) => MergedTableInfo.fromJson(e as Map<String, dynamic>))
-          .toList() ??
+      mergedTables:
+          (json['mergedTables'] as List?)
+              ?.map((e) => MergedTableInfo.fromJson(e as Map<String, dynamic>))
+              .toList() ??
           [],
       statusSummary: json['statusSummary'] != null
-          ? TableStatusSummary.fromJson(json['statusSummary'] as Map<String, dynamic>)
+          ? TableStatusSummary.fromJson(
+              json['statusSummary'] as Map<String, dynamic>,
+            )
           : const TableStatusSummary(message: ''),
     );
   }
@@ -191,7 +201,9 @@ class TableSessionDetails {
       guestCount: json['guestCount'] as int? ?? 1,
       guestName: json['guestName'] as String?,
       guestPhone: json['guestPhone'] as String?,
-      startedAt: DateTime.tryParse(json['startedAt'] as String? ?? '') ?? DateTime.now(),
+      startedAt:
+          DateTime.tryParse(json['startedAt'] as String? ?? '') ??
+          DateTime.now(),
       duration: json['duration'] as int? ?? 0,
       notes: json['notes'] as String?,
     );
@@ -276,7 +288,9 @@ class TableOrderDetails {
       customerName: json['customerName'] as String?,
       customerPhone: json['customerPhone'] as String?,
       specialInstructions: json['specialInstructions'] as String?,
-      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
+      createdAt:
+          DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+          DateTime.now(),
     );
   }
 }
@@ -335,9 +349,10 @@ class TableOrderItem {
       stationType: json['stationType'] as String?,
       specialInstructions: json['specialInstructions'] as String?,
       isComplimentary: json['isComplimentary'] as bool? ?? false,
-      addons: (json['addons'] as List?)
-          ?.map((e) => ItemAddon.fromJson(e as Map<String, dynamic>))
-          .toList() ??
+      addons:
+          (json['addons'] as List?)
+              ?.map((e) => ItemAddon.fromJson(e as Map<String, dynamic>))
+              .toList() ??
           [],
     );
   }
@@ -381,7 +396,8 @@ class TableKot {
   final String? station;
   final int itemCount;
   final int priority;
-  final int? acceptedBy;
+  final String?
+  acceptedBy; // Changed from int? to String? to match API (returns name, not ID)
   final DateTime? acceptedAt;
   final DateTime? readyAt;
   final DateTime? servedAt;
@@ -409,7 +425,8 @@ class TableKot {
       station: json['station'] as String?,
       itemCount: json['itemCount'] as int? ?? 0,
       priority: json['priority'] as int? ?? 0,
-      acceptedBy: json['acceptedBy'] as int?,
+      acceptedBy:
+          json['acceptedBy'] as String?, // Parse as String (captain name)
       acceptedAt: json['acceptedAt'] != null
           ? DateTime.tryParse(json['acceptedAt'] as String)
           : null,
@@ -419,13 +436,16 @@ class TableKot {
       servedAt: json['servedAt'] != null
           ? DateTime.tryParse(json['servedAt'] as String)
           : null,
-      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
+      createdAt:
+          DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+          DateTime.now(),
     );
   }
 
   bool get isPending => status == 'pending';
   bool get isReady => status == 'ready';
   bool get isServed => status == 'served';
+  bool get isAccepted => acceptedBy != null;
 }
 
 class TableBilling {
@@ -478,15 +498,14 @@ class TableTimelineEvent {
   final String? details;
   final DateTime timestamp;
 
-  const TableTimelineEvent({
-    this.details,
-    required this.timestamp,
-  });
+  const TableTimelineEvent({this.details, required this.timestamp});
 
   factory TableTimelineEvent.fromJson(Map<String, dynamic> json) {
     return TableTimelineEvent(
       details: json['details'] as String?,
-      timestamp: DateTime.tryParse(json['timestamp'] as String? ?? '') ?? DateTime.now(),
+      timestamp:
+          DateTime.tryParse(json['timestamp'] as String? ?? '') ??
+          DateTime.now(),
     );
   }
 }
@@ -517,18 +536,30 @@ class MergedTableInfo {
   factory MergedTableInfo.fromJson(Map<String, dynamic> json) {
     return MergedTableInfo(
       id: json['id'] as int? ?? 0,
-      primaryTableId: json['primary_table_id'] as int? ?? json['primaryTableId'] as int? ?? 0,
-      mergedTableId: json['merged_table_id'] as int? ?? json['mergedTableId'] as int? ?? 0,
-      tableSessionId: json['table_session_id'] as int? ?? json['tableSessionId'] as int?,
+      primaryTableId:
+          json['primary_table_id'] as int? ??
+          json['primaryTableId'] as int? ??
+          0,
+      mergedTableId:
+          json['merged_table_id'] as int? ?? json['mergedTableId'] as int? ?? 0,
+      tableSessionId:
+          json['table_session_id'] as int? ?? json['tableSessionId'] as int?,
       mergedBy: json['merged_by'] as int? ?? json['mergedBy'] as int?,
-      mergedAt: DateTime.tryParse(json['merged_at'] as String? ?? json['mergedAt'] as String? ?? '') ?? DateTime.now(),
+      mergedAt:
+          DateTime.tryParse(
+            json['merged_at'] as String? ?? json['mergedAt'] as String? ?? '',
+          ) ??
+          DateTime.now(),
       unmergedAt: json['unmerged_at'] != null
           ? DateTime.tryParse(json['unmerged_at'] as String)
           : json['unmergedAt'] != null
           ? DateTime.tryParse(json['unmergedAt'] as String)
           : null,
       unmergedBy: json['unmerged_by'] as int? ?? json['unmergedBy'] as int?,
-      mergedTableNumber: json['merged_table_number'] as String? ?? json['mergedTableNumber'] as String? ?? '',
+      mergedTableNumber:
+          json['merged_table_number'] as String? ??
+          json['mergedTableNumber'] as String? ??
+          '',
     );
   }
 }

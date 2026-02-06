@@ -6,41 +6,48 @@ import '../../../layout/data/repositories/layout_repository.dart';
 import '../../data/models/table_details_model.dart';
 
 /// Provider for fetching table details
-final tableDetailsProvider = FutureProvider.family<TableDetailsResponse?, int>((ref, tableId) async {
+final tableDetailsProvider = FutureProvider.family<TableDetailsResponse?, int>((
+  ref,
+  tableId,
+) async {
   final repository = ref.watch(layoutRepositoryProvider);
   final result = await repository.getTableDetails(tableId);
-  
-  return result.when(
-    success: (data, _) => data,
-    failure: (_, __, ___) => null,
-  );
+
+  return result.when(success: (data, _) => data, failure: (_, __, ___) => null);
 });
 
 /// Provider to store current table details for order screen navigation
-final currentTableDetailsProvider = StateProvider<TableDetailsResponse?>((ref) => null);
+final currentTableDetailsProvider = StateProvider<TableDetailsResponse?>(
+  (ref) => null,
+);
 
 /// Shows table details popup/bottom sheet based on device type
-void showTableDetailsPopup(BuildContext context, int tableId, {VoidCallback? onViewOrder}) {
+/// Always invalidates the provider to fetch fresh data
+void showTableDetailsPopup(
+  BuildContext context,
+  int tableId, {
+  VoidCallback? onViewOrder,
+  WidgetRef? ref,
+}) {
+  // Invalidate the provider to fetch fresh data
+  ref?.invalidate(tableDetailsProvider(tableId));
+
   final screenWidth = MediaQuery.of(context).size.width;
   final isMobile = screenWidth < 600;
-  
+
   if (isMobile) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => TableDetailsSheet(
-        tableId: tableId,
-        onViewOrder: onViewOrder,
-      ),
+      builder: (context) =>
+          TableDetailsSheet(tableId: tableId, onViewOrder: onViewOrder),
     );
   } else {
     showDialog(
       context: context,
-      builder: (context) => TableDetailsDialog(
-        tableId: tableId,
-        onViewOrder: onViewOrder,
-      ),
+      builder: (context) =>
+          TableDetailsDialog(tableId: tableId, onViewOrder: onViewOrder),
     );
   }
 }
@@ -50,11 +57,7 @@ class TableDetailsSheet extends ConsumerWidget {
   final int tableId;
   final VoidCallback? onViewOrder;
 
-  const TableDetailsSheet({
-    super.key,
-    required this.tableId,
-    this.onViewOrder,
-  });
+  const TableDetailsSheet({super.key, required this.tableId, this.onViewOrder});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -96,7 +99,8 @@ class TableDetailsSheet extends ConsumerWidget {
                 padding: EdgeInsets.all(40),
                 child: LoadingIndicator(size: LoadingSize.large),
               ),
-              error: (_, __) => const Center(child: Text('Error loading table details')),
+              error: (_, __) =>
+                  const Center(child: Text('Error loading table details')),
             ),
           ),
         ],
@@ -140,10 +144,7 @@ class TableDetailsDialog extends ConsumerWidget {
                 children: [
                   const Text(
                     'Table Details',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const Spacer(),
                   IconButton(
@@ -166,7 +167,8 @@ class TableDetailsDialog extends ConsumerWidget {
                   padding: EdgeInsets.all(40),
                   child: LoadingIndicator(size: LoadingSize.large),
                 ),
-                error: (_, __) => const Center(child: Text('Error loading table details')),
+                error: (_, __) =>
+                    const Center(child: Text('Error loading table details')),
               ),
             ),
           ],
@@ -181,10 +183,7 @@ class _TableDetailsContent extends ConsumerWidget {
   final TableDetailsResponse details;
   final VoidCallback? onViewOrder;
 
-  const _TableDetailsContent({
-    required this.details,
-    this.onViewOrder,
-  });
+  const _TableDetailsContent({required this.details, this.onViewOrder});
 
   Color get _statusColor {
     switch (details.status) {
@@ -217,50 +216,50 @@ class _TableDetailsContent extends ConsumerWidget {
           // Table header with status
           _buildTableHeader(),
           const SizedBox(height: 16),
-          
+
           // Status summary message
           _buildStatusSummary(),
           const SizedBox(height: 16),
-          
+
           // Session info (if active)
           if (details.session != null) ...[
             _buildSessionInfo(),
             const SizedBox(height: 16),
           ],
-          
+
           // Captain info (if assigned)
           if (details.captain != null) ...[
             _buildCaptainInfo(),
             const SizedBox(height: 16),
           ],
-          
+
           // Order info (if exists)
           if (details.order != null) ...[
             _buildOrderInfo(),
             const SizedBox(height: 16),
           ],
-          
+
           // Items list (if has items)
           if (details.hasItems) ...[
             _buildItemsList(),
             const SizedBox(height: 16),
           ],
-          
+
           // KOTs list (if has KOTs)
           if (details.hasKots) ...[
             _buildKotsList(),
             const SizedBox(height: 16),
           ],
-          
+
           // Merged tables (if any)
           if (details.mergedTables.isNotEmpty) ...[
             _buildMergedTables(),
             const SizedBox(height: 16),
           ],
-          
+
           // Action buttons
           _buildActionButtons(context, ref),
-          
+
           SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
         ],
       ),
@@ -325,11 +324,7 @@ class _TableDetailsContent extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          Icon(
-            _getStatusIcon(),
-            color: _statusColor,
-            size: 20,
-          ),
+          Icon(_getStatusIcon(), color: _statusColor, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -377,8 +372,7 @@ class _TableDetailsContent extends ConsumerWidget {
         if (session.guestName != null)
           _buildInfoRow('Guest Name', session.guestName!),
         _buildInfoRow('Duration', session.formattedDuration),
-        if (session.notes != null)
-          _buildInfoRow('Notes', session.notes!),
+        if (session.notes != null) _buildInfoRow('Notes', session.notes!),
       ],
     );
   }
@@ -410,7 +404,10 @@ class _TableDetailsContent extends ConsumerWidget {
         if (order.taxAmount > 0)
           _buildInfoRow('Tax', '₹${order.taxAmount.toStringAsFixed(2)}'),
         if (order.discountAmount > 0)
-          _buildInfoRow('Discount', '-₹${order.discountAmount.toStringAsFixed(2)}'),
+          _buildInfoRow(
+            'Discount',
+            '-₹${order.discountAmount.toStringAsFixed(2)}',
+          ),
         _buildInfoRow(
           'Total',
           '₹${order.totalAmount.toStringAsFixed(2)}',
@@ -425,70 +422,72 @@ class _TableDetailsContent extends ConsumerWidget {
       title: 'Items (${details.items.length})',
       icon: Icons.fastfood,
       children: [
-        ...details.items.map((item) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(
-            children: [
-              // Veg/Non-veg indicator
-              Container(
-                width: 14,
-                height: 14,
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: item.isVeg ? Colors.green : Colors.red,
-                    width: 1.5,
-                  ),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-                child: Center(
-                  child: Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
+        ...details.items.map(
+          (item) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                // Veg/Non-veg indicator
+                Container(
+                  width: 14,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    border: Border.all(
                       color: item.isVeg ? Colors.green : Colors.red,
-                      shape: BoxShape.circle,
+                      width: 1.5,
+                    ),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                  child: Center(
+                    child: Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: item.isVeg ? Colors.green : Colors.red,
+                        shape: BoxShape.circle,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.displayName,
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                    if (item.hasAddons)
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        item.addons.map((a) => a.name).join(', '),
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textSecondary,
-                        ),
+                        item.displayName,
+                        style: const TextStyle(fontSize: 13),
                       ),
-                  ],
+                      if (item.hasAddons)
+                        Text(
+                          item.addons.map((a) => a.name).join(', '),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-              Text(
-                'x${item.quantity.toInt()}',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
+                Text(
+                  'x${item.quantity.toInt()}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                '₹${item.totalPrice.toStringAsFixed(0)}',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+                const SizedBox(width: 12),
+                Text(
+                  '₹${item.totalPrice.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        )),
+        ),
       ],
     );
   }
@@ -498,63 +497,68 @@ class _TableDetailsContent extends ConsumerWidget {
       title: 'KOTs (${details.kots.length})',
       icon: Icons.receipt_long,
       children: [
-        ...details.kots.map((kot) => Container(
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: _getKotStatusColor(kot.status).withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(
-              color: _getKotStatusColor(kot.status).withValues(alpha: 0.3),
+        ...details.kots.map(
+          (kot) => Container(
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: _getKotStatusColor(kot.status).withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: _getKotStatusColor(kot.status).withValues(alpha: 0.3),
+              ),
             ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                _getKotStatusIcon(kot.status),
-                size: 16,
-                color: _getKotStatusColor(kot.status),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      kot.kotNumber,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      '${kot.station ?? 'Kitchen'} • ${kot.itemCount} items',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
+            child: Row(
+              children: [
+                Icon(
+                  _getKotStatusIcon(kot.status),
+                  size: 16,
                   color: _getKotStatusColor(kot.status),
-                  borderRadius: BorderRadius.circular(4),
                 ),
-                child: Text(
-                  kot.status.toUpperCase(),
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        kot.kotNumber,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        '${kot.station ?? 'Kitchen'} • ${kot.itemCount} items',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            ],
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _getKotStatusColor(kot.status),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    kot.status.toUpperCase(),
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        )),
+        ),
       ],
     );
   }
@@ -597,21 +601,28 @@ class _TableDetailsContent extends ConsumerWidget {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: details.mergedTables.map((mt) => Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColors.scaffoldBackground,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Text(
-              mt.mergedTableNumber,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          )).toList(),
+          children: details.mergedTables
+              .map(
+                (mt) => Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.scaffoldBackground,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Text(
+                    mt.mergedTableNumber,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
         ),
       ],
     );
@@ -691,11 +702,17 @@ class _TableDetailsContent extends ConsumerWidget {
   }
 
   Widget _buildActionButtons(BuildContext context, WidgetRef ref) {
+    // Check if table is occupied/running but has no order
+    final isOccupiedWithoutOrder =
+        (details.status == 'occupied' || details.status == 'running') &&
+        details.session != null &&
+        !details.hasActiveOrder;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // Primary action based on status
-        if (details.status == 'available') ...[
+        if (details.status == 'available' || details.status.isEmpty) ...[
           ElevatedButton.icon(
             onPressed: () {
               Navigator.of(context).pop();
@@ -712,6 +729,26 @@ class _TableDetailsContent extends ConsumerWidget {
               ),
             ),
           ),
+        ] else if (isOccupiedWithoutOrder) ...[
+          // Occupied table with session but no order - show TAKE ORDER button
+          ElevatedButton.icon(
+            onPressed: () {
+              // Store table details for order screen to use
+              ref.read(currentTableDetailsProvider.notifier).state = details;
+              Navigator.of(context).pop();
+              onViewOrder?.call();
+            },
+            icon: const Icon(Icons.restaurant_menu),
+            label: const Text('TAKE ORDER'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.success,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
         ] else if (details.hasActiveOrder) ...[
           Row(
             children: [
@@ -719,7 +756,8 @@ class _TableDetailsContent extends ConsumerWidget {
                 child: ElevatedButton.icon(
                   onPressed: () {
                     // Store table details for order screen to use
-                    ref.read(currentTableDetailsProvider.notifier).state = details;
+                    ref.read(currentTableDetailsProvider.notifier).state =
+                        details;
                     Navigator.of(context).pop();
                     onViewOrder?.call();
                   },
@@ -747,7 +785,10 @@ class _TableDetailsContent extends ConsumerWidget {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.secondary,
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: const BorderSide(color: AppColors.secondary, width: 2),
+                    side: const BorderSide(
+                      color: AppColors.secondary,
+                      width: 2,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),

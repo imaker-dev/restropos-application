@@ -1,4 +1,4 @@
-package com.imaker.restro
+package com.imaker.restroApp
 
 import io.flutter.embedding.android.FlutterActivity
 
