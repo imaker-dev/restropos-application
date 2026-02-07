@@ -10,6 +10,7 @@ import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/menu/data/models/menu_models.dart';
 import '../../features/menu/menu.dart' hide MenuItemType;
 import '../../features/order_history/presentation/order_history_screen.dart';
+import '../../features/report_history/report_history_screen.dart';
 import '../../features/tables/tables.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 
@@ -27,7 +28,7 @@ class _CaptainHomeScreenState extends ConsumerState<CaptainHomeScreen> {
     _NavItem(icon: Icons.table_restaurant, label: 'Tables'),
     _NavItem(icon: Icons.edit_note_sharp, label: 'Orders'),
     _NavItem(icon: Icons.dining, label: 'Menu'),
-    // _NavItem(icon: Icons.delivery_dining, label: 'Delivery'),
+    _NavItem(icon: Icons.layers, label: 'Sales Report'),
     _NavItem(icon: Icons.history_toggle_off, label: 'History'),
   ];
 
@@ -300,9 +301,9 @@ class _CaptainHomeScreenState extends ConsumerState<CaptainHomeScreen> {
         return _buildOrdersView();
       case 2:
         return _buildMenuView();
-      // case 3:
-      //   return _buildDeliveryView();
       case 3:
+        return ReportHistoryScreen();
+      case 4:
         return OrderHistoryScreen();
       // case 5:
       //   return _buildHistoryView();

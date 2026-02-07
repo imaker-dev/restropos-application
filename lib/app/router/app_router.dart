@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:restro/features/profile/presentation/profile_screen.dart';
-import 'package:restro/features/report_history/report_history_screen.dart';
 import '../../features/auth/auth.dart';
 import '../../features/orders/presentation/screens/screens.dart';
 import '../screens/captain_home_screen.dart';
@@ -43,7 +42,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/',
         name: 'home',
-        builder: (context, state) => const ReportHistoryScreen(),
+        builder: (context, state) => const CaptainHomeScreen(),
         routes: [
           GoRoute(
             path: 'table/:tableId',

@@ -18,7 +18,7 @@ class ReportList extends ConsumerWidget {
       itemCount: reports.length,
       itemBuilder: (context, index) {
         final data = reports[index];
-        return ReportListItem(data: data);
+        return ReportListItem(data: data, selectedRange: filter.range);
       },
     );
   }
@@ -90,6 +90,9 @@ class ReportList extends ConsumerWidget {
         orders: 42,
         amount: 6240,
         rangeKey: "daily",
+        status: "completed",
+        category: "Sales",
+        description: "Daily sales summary report",
       ),
       ReportItem(
         id: "2",
@@ -98,6 +101,9 @@ class ReportList extends ConsumerWidget {
         orders: 210,
         amount: 31200,
         rangeKey: "weekly",
+        status: "completed",
+        category: "Payments",
+        description: "Weekly payment collection analysis",
       ),
       ReportItem(
         id: "3",
@@ -106,6 +112,9 @@ class ReportList extends ConsumerWidget {
         orders: 820,
         amount: 118500,
         rangeKey: "monthly",
+        status: "completed",
+        category: "Analytics",
+        description: "Monthly top selling items report",
       ),
       ReportItem(
         id: "4",
@@ -114,6 +123,9 @@ class ReportList extends ConsumerWidget {
         orders: 8,
         amount: 900,
         rangeKey: "daily",
+        status: "pending",
+        category: "Operations",
+        description: "Daily order cancellation analysis",
       ),
       ReportItem(
         id: "5",
@@ -122,6 +134,9 @@ class ReportList extends ConsumerWidget {
         orders: 198,
         amount: 28700,
         rangeKey: "weekly",
+        status: "completed",
+        category: "Finance",
+        description: "Weekly tax collection summary",
       ),
     ];
   }

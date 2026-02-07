@@ -14,10 +14,7 @@ class ReportHistoryScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text("Report History"),
-        elevation: 0,
-      ),
+
       body: Column(
         children: const [
           ReportHeader(),
