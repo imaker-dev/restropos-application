@@ -2,12 +2,16 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/constants.dart';
+import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/network/websocket_service.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../layout/data/repositories/layout_repository.dart';
+import '../../../orders/data/repositories/order_repository.dart';
+import '../../../orders/presentation/widgets/cancel_order_dialog.dart';
 import '../../../orders/presentation/widgets/kot_details_popup.dart';
 import '../../data/models/table_details_model.dart';
+import '../providers/tables_provider.dart';
 
 /// Provider for fetching table details
 final tableDetailsProvider = FutureProvider.family<TableDetailsResponse?, int>((
@@ -129,56 +133,154 @@ class TableDetailsDialog extends ConsumerWidget {
     final detailsAsync = ref.watch(tableDetailsProvider(tableId));
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 32),
       child: Container(
-        width: 500,
+        width: 680,
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.8,
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Header with close button
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: AppColors.border)),
-              ),
-              child: Row(
-                children: [
-                  const Text(
-                    'Table Details',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
-            ),
-            // Content
-            Flexible(
-              child: detailsAsync.when(
-                data: (details) => details != null
-                    ? _TableDetailsContent(
-                        details: details,
-                        onViewOrder: onViewOrder,
-                      )
-                    : const Center(child: Text('Failed to load table details')),
-                loading: () => const Padding(
-                  padding: EdgeInsets.all(40),
-                  child: LoadingIndicator(size: LoadingSize.large),
-                ),
-                error: (_, __) =>
-                    const Center(child: Text('Error loading table details')),
-              ),
+        decoration: BoxDecoration(
+          color: AppColors.scaffoldBackground,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.15),
+              blurRadius: 30,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
+        clipBehavior: Clip.antiAlias,
+        child: detailsAsync.when(
+          data: (details) {
+            if (details == null) {
+              return const Center(child: Text('Failed to load table details'));
+            }
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Colored header bar
+                _buildDialogHeader(context, details),
+                // Content
+                Flexible(
+                  child: _TableDetailsContent(
+                    details: details,
+                    onViewOrder: onViewOrder,
+                    isDesktopDialog: true,
+                  ),
+                ),
+              ],
+            );
+          },
+          loading: () => const SizedBox(
+            height: 200,
+            child: Center(child: LoadingIndicator(size: LoadingSize.large)),
+          ),
+          error: (_, __) => const SizedBox(
+            height: 200,
+            child: Center(child: Text('Error loading table details')),
+          ),
+        ),
       ),
     );
+  }
+
+  Widget _buildDialogHeader(
+    BuildContext context,
+    TableDetailsResponse details,
+  ) {
+    final statusColor = _getTableStatusColor(details.status);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 20, 16, 20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [statusColor, statusColor.withValues(alpha: 0.85)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Row(
+        children: [
+          // Table number badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.25),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
+            ),
+            child: Text(
+              details.tableNumber,
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  details.status.toUpperCase(),
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${details.location.sectionName ?? 'Unknown'} · ${details.shape} · ${details.capacity} seats',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.white.withValues(alpha: 0.85),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Material(
+            color: Colors.white.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(8),
+            child: InkWell(
+              onTap: () => Navigator.of(context).pop(),
+              borderRadius: BorderRadius.circular(8),
+              child: const Padding(
+                padding: EdgeInsets.all(8),
+                child: Icon(Icons.close, color: Colors.white, size: 20),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static Color _getTableStatusColor(String status) {
+    switch (status) {
+      case 'available':
+        return AppColors.tableAvailable;
+      case 'occupied':
+        return AppColors.tableOccupied;
+      case 'running':
+        return AppColors.tableRunning;
+      case 'billing':
+        return AppColors.tableBilling;
+      case 'cleaning':
+        return AppColors.tableCleaning;
+      case 'blocked':
+        return AppColors.tableBlocked;
+      case 'reserved':
+        return AppColors.tableReserved;
+      default:
+        return AppColors.tableAvailable;
+    }
   }
 }
 
@@ -186,8 +288,13 @@ class TableDetailsDialog extends ConsumerWidget {
 class _TableDetailsContent extends ConsumerStatefulWidget {
   final TableDetailsResponse details;
   final VoidCallback? onViewOrder;
+  final bool isDesktopDialog;
 
-  const _TableDetailsContent({required this.details, this.onViewOrder});
+  const _TableDetailsContent({
+    required this.details,
+    this.onViewOrder,
+    this.isDesktopDialog = false,
+  });
 
   @override
   ConsumerState<_TableDetailsContent> createState() =>
@@ -197,18 +304,95 @@ class _TableDetailsContent extends ConsumerStatefulWidget {
 class _TableDetailsContentState extends ConsumerState<_TableDetailsContent> {
   late TableDetailsResponse _details;
   StreamSubscription<Map<String, dynamic>>? _kotSub;
+  StreamSubscription<Map<String, dynamic>>? _tableSub;
+  StreamSubscription<Map<String, dynamic>>? _orderSub;
+  StreamSubscription<Map<String, dynamic>>? _itemCancelledSub;
+  bool _isRefreshing = false;
 
   @override
   void initState() {
     super.initState();
     _details = widget.details;
     _listenToKotUpdates();
+    _listenToTableAndOrderUpdates();
+  }
+
+  @override
+  void didUpdateWidget(covariant _TableDetailsContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.details != oldWidget.details) {
+      setState(() {
+        _details = widget.details;
+      });
+    }
   }
 
   @override
   void dispose() {
     _kotSub?.cancel();
+    _tableSub?.cancel();
+    _orderSub?.cancel();
+    _itemCancelledSub?.cancel();
     super.dispose();
+  }
+
+  /// Listen to table:updated, order:updated, and kot:item_cancelled events
+  void _listenToTableAndOrderUpdates() {
+    final wsService = ref.read(webSocketServiceProvider);
+
+    _tableSub = wsService.tableUpdates.listen((data) {
+      if (_isEventForThisTable(data)) {
+        _refreshDetails();
+      }
+    });
+
+    _orderSub = wsService.orderUpdates.listen((data) {
+      if (_isEventForThisTable(data)) {
+        _refreshDetails();
+      }
+    });
+
+    _itemCancelledSub = wsService.kotItemCancelled.listen((data) {
+      if (_isEventForThisTable(data)) {
+        _refreshDetails();
+      }
+    });
+  }
+
+  /// Check if a WebSocket event belongs to this table
+  bool _isEventForThisTable(Map<String, dynamic> data) {
+    final tableId = data['tableId'] as int? ?? data['table_id'] as int?;
+    if (tableId == _details.id) return true;
+
+    // Also match by orderId if available
+    final orderId = data['orderId'] as int? ?? data['order_id'] as int?;
+    if (orderId != null && _details.order?.id == orderId) return true;
+
+    return false;
+  }
+
+  /// Re-fetch table details from API without showing loading spinner
+  Future<void> _refreshDetails() async {
+    if (_isRefreshing || !mounted) return;
+    _isRefreshing = true;
+
+    try {
+      final repository = ref.read(layoutRepositoryProvider);
+      final result = await repository.getTableDetails(_details.id);
+      if (!mounted) return;
+      result.when(
+        success: (data, _) {
+          setState(() {
+            _details = data;
+          });
+        },
+        failure: (_, __, ___) {
+          // Silently keep existing data
+        },
+      );
+    } finally {
+      _isRefreshing = false;
+    }
   }
 
   void _listenToKotUpdates() {
@@ -217,11 +401,20 @@ class _TableDetailsContentState extends ConsumerState<_TableDetailsContent> {
       final kotId =
           data['kotId'] as int? ?? data['kot_id'] as int? ?? data['id'] as int?;
       final newStatus = data['status'] as String?;
-      if (kotId == null || newStatus == null) return;
+      final tableId = data['tableId'] as int? ?? data['table_id'] as int?;
 
-      // Check if this KOT belongs to our table's order
-      final matchIndex = _details.kots.indexWhere((k) => k.id == kotId);
-      if (matchIndex >= 0) {
+      // Match by KOT ID first
+      final matchIndex = kotId != null
+          ? _details.kots.indexWhere((k) => k.id == kotId)
+          : -1;
+
+      // Check if this event belongs to our table (by KOT match or tableId)
+      final isForThisTable = matchIndex >= 0 || tableId == _details.id;
+
+      if (!isForThisTable) return;
+
+      // If we matched a KOT and have a status, do optimistic local update
+      if (matchIndex >= 0 && newStatus != null) {
         setState(() {
           final updatedKots = List<TableKot>.from(_details.kots);
           final old = updatedKots[matchIndex];
@@ -231,6 +424,8 @@ class _TableDetailsContentState extends ConsumerState<_TableDetailsContent> {
             status: newStatus,
             station: old.station,
             itemCount: old.itemCount,
+            totalItemCount: old.totalItemCount,
+            cancelledItemCount: old.cancelledItemCount,
             priority: old.priority,
             acceptedBy:
                 (data['acceptedBy'] as String?) ??
@@ -266,6 +461,9 @@ class _TableDetailsContentState extends ConsumerState<_TableDetailsContent> {
           );
         });
       }
+
+      // Always do a full refresh to get complete updated data from API
+      _refreshDetails();
     });
   }
 
@@ -292,8 +490,17 @@ class _TableDetailsContentState extends ConsumerState<_TableDetailsContent> {
     }
   }
 
+  bool get _isDesktop => widget.isDesktopDialog;
+
   @override
   Widget build(BuildContext context) {
+    if (_isDesktop) {
+      return _buildDesktopLayout();
+    }
+    return _buildMobileLayout();
+  }
+
+  Widget _buildMobileLayout() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -349,6 +556,95 @@ class _TableDetailsContentState extends ConsumerState<_TableDetailsContent> {
           SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
         ],
       ),
+    );
+  }
+
+  Widget _buildDesktopLayout() {
+    final hasSessionOrCaptain =
+        details.session != null || details.captain != null;
+    final hasOrderOrItems = details.order != null || details.hasItems;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Status summary
+                _buildStatusSummary(),
+                const SizedBox(height: 16),
+
+                // Row 1: Session + Captain side by side
+                if (hasSessionOrCaptain) ...[
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (details.session != null)
+                        Expanded(child: _buildSessionInfo()),
+                      if (details.session != null && details.captain != null)
+                        const SizedBox(width: 16),
+                      if (details.captain != null)
+                        Expanded(child: _buildCaptainInfo()),
+                      // If only one exists, add spacer
+                      if (details.session != null && details.captain == null)
+                        const Expanded(child: SizedBox()),
+                      if (details.session == null && details.captain != null)
+                        const Expanded(child: SizedBox()),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // Row 2: Order info + KOTs side by side
+                if (hasOrderOrItems || details.hasKots) ...[
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (details.order != null)
+                        Expanded(child: _buildOrderInfo()),
+                      if (details.order != null && details.hasKots)
+                        const SizedBox(width: 16),
+                      if (details.hasKots) Expanded(child: _buildKotsList()),
+                      // If only one exists, add spacer
+                      if (details.order != null && !details.hasKots)
+                        const Expanded(child: SizedBox()),
+                      if (details.order == null && details.hasKots)
+                        const Expanded(child: SizedBox()),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // Items list full width
+                if (details.hasItems) ...[
+                  _buildItemsList(),
+                  const SizedBox(height: 16),
+                ],
+
+                // Merged tables full width
+                if (details.mergedTables.isNotEmpty) ...[
+                  _buildMergedTables(),
+                  const SizedBox(height: 16),
+                ],
+              ],
+            ),
+          ),
+        ),
+        // Action buttons pinned at bottom
+        Container(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(
+              top: BorderSide(color: AppColors.border.withValues(alpha: 0.5)),
+            ),
+          ),
+          child: _buildActionButtons(context, ref),
+        ),
+      ],
     );
   }
 
@@ -504,76 +800,133 @@ class _TableDetailsContentState extends ConsumerState<_TableDetailsContent> {
   }
 
   Widget _buildItemsList() {
+    final cancelledCount = details.items
+        .where((i) => i.status == 'cancelled')
+        .length;
     return _buildInfoCard(
-      title: 'Items (${details.items.length})',
+      title:
+          'Items (${details.items.length})${cancelledCount > 0 ? ' • $cancelledCount cancelled' : ''}',
       icon: Icons.fastfood,
       children: [
-        ...details.items.map(
-          (item) => Padding(
+        ...details.items.map((item) {
+          final isCancelled = item.status == 'cancelled';
+          return Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              children: [
-                // Veg/Non-veg indicator
-                Container(
-                  width: 14,
-                  height: 14,
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: item.isVeg ? Colors.green : Colors.red,
-                      width: 1.5,
-                    ),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                  child: Center(
-                    child: Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: item.isVeg ? Colors.green : Colors.red,
-                        shape: BoxShape.circle,
+            child: Opacity(
+              opacity: isCancelled ? 0.55 : 1.0,
+              child: Row(
+                children: [
+                  // Veg/Non-veg indicator
+                  Container(
+                    width: 14,
+                    height: 14,
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: isCancelled
+                            ? AppColors.error
+                            : item.isVeg
+                            ? Colors.green
+                            : Colors.red,
+                        width: 1.5,
                       ),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                    child: Center(
+                      child: isCancelled
+                          ? Icon(Icons.close, size: 10, color: AppColors.error)
+                          : Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: item.isVeg ? Colors.green : Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.displayName,
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                      if (item.hasAddons)
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          item.addons.map((a) => a.name).join(', '),
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textSecondary,
+                          item.displayName,
+                          style: TextStyle(
+                            fontSize: 13,
+                            decoration: isCancelled
+                                ? TextDecoration.lineThrough
+                                : null,
+                            decorationColor: AppColors.error,
+                            color: isCancelled ? AppColors.textSecondary : null,
                           ),
                         ),
-                    ],
+                        if (item.hasAddons)
+                          Text(
+                            item.addons.map((a) => a.name).join(', '),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textSecondary,
+                              decoration: isCancelled
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-                Text(
-                  'x${item.quantity.toInt()}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+                  if (isCancelled)
+                    Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(3),
+                        border: Border.all(
+                          color: AppColors.error.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: const Text(
+                        'CANCELLED',
+                        style: TextStyle(
+                          fontSize: 8,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.error,
+                        ),
+                      ),
+                    ),
+                  Text(
+                    'x${item.quantity.toInt()}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      decoration: isCancelled
+                          ? TextDecoration.lineThrough
+                          : null,
+                      decorationColor: AppColors.error,
+                      color: isCancelled ? AppColors.textSecondary : null,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  '₹${item.totalPrice.toStringAsFixed(0)}',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                  const SizedBox(width: 12),
+                  Text(
+                    '₹${item.totalPrice.toStringAsFixed(0)}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      decoration: isCancelled
+                          ? TextDecoration.lineThrough
+                          : null,
+                      decorationColor: AppColors.error,
+                      color: isCancelled ? AppColors.textSecondary : null,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ),
+          );
+        }),
       ],
     );
   }
@@ -616,10 +969,12 @@ class _TableDetailsContentState extends ConsumerState<_TableDetailsContent> {
                           ),
                         ),
                         Text(
-                          '${kot.station ?? 'Kitchen'} • ${kot.itemCount} items',
-                          style: const TextStyle(
+                          '${kot.station ?? 'kitchen'} • ${kot.itemCount} items${kot.hasCancelledItems ? ' (${kot.cancelledItemCount} cancelled)' : ''}',
+                          style: TextStyle(
                             fontSize: 11,
-                            color: AppColors.textSecondary,
+                            color: kot.isCancelled
+                                ? AppColors.error.withValues(alpha: 0.7)
+                                : AppColors.textSecondary,
                           ),
                         ),
                       ],
@@ -668,6 +1023,8 @@ class _TableDetailsContentState extends ConsumerState<_TableDetailsContent> {
         return AppColors.success;
       case 'served':
         return AppColors.textSecondary;
+      case 'cancelled':
+        return AppColors.error;
       default:
         return AppColors.textSecondary;
     }
@@ -683,6 +1040,8 @@ class _TableDetailsContentState extends ConsumerState<_TableDetailsContent> {
         return Icons.done_all;
       case 'served':
         return Icons.check_circle;
+      case 'cancelled':
+        return Icons.cancel;
       default:
         return Icons.receipt;
     }
@@ -731,18 +1090,34 @@ class _TableDetailsContentState extends ConsumerState<_TableDetailsContent> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+        boxShadow: _isDesktop
+            ? [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header
           Container(
-            padding: const EdgeInsets.all(12),
-            decoration: const BoxDecoration(
+            padding: EdgeInsets.all(_isDesktop ? 14 : 12),
+            decoration: BoxDecoration(
               color: AppColors.scaffoldBackground,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(10),
+              ),
+              border: Border(
+                bottom: BorderSide(
+                  color: AppColors.border.withValues(alpha: 0.3),
+                ),
+              ),
             ),
             child: Row(
               children: [
@@ -750,8 +1125,8 @@ class _TableDetailsContentState extends ConsumerState<_TableDetailsContent> {
                 const SizedBox(width: 8),
                 Text(
                   title,
-                  style: const TextStyle(
-                    fontSize: 14,
+                  style: TextStyle(
+                    fontSize: _isDesktop ? 15 : 14,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -760,7 +1135,7 @@ class _TableDetailsContentState extends ConsumerState<_TableDetailsContent> {
           ),
           // Content
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: EdgeInsets.all(_isDesktop ? 16 : 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: children,
@@ -793,6 +1168,49 @@ class _TableDetailsContentState extends ConsumerState<_TableDetailsContent> {
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _onCancelOrder(BuildContext context, WidgetRef ref) async {
+    final order = _details.order;
+    if (order == null) return;
+
+    final outletId = ApiEndpoints.defaultOutletId;
+
+    final result = await showCancelOrderDialog(
+      context,
+      orderNumber: order.orderNumber,
+      outletId: outletId,
+      orderTotal: order.totalAmount,
+      itemCount: _details.items.length,
+    );
+
+    if (result == null || !mounted) return;
+
+    // Call API to cancel order
+    final apiResult = await ref
+        .read(orderRepositoryProvider)
+        .cancelOrder(
+          orderId: order.id,
+          reason: result.reason,
+          reasonId: result.reasonId,
+        );
+
+    if (!mounted) return;
+
+    apiResult.when(
+      success: (_, __) {
+        Toast.success(context, 'Order cancelled');
+
+        // Refresh tables to get fresh data
+        ref.read(tablesProvider.notifier).refresh();
+
+        // Close popup
+        Navigator.of(context).pop();
+      },
+      failure: (message, _, __) {
+        Toast.error(context, 'Failed to cancel order: $message');
+      },
     );
   }
 
@@ -933,6 +1351,24 @@ class _TableDetailsContentState extends ConsumerState<_TableDetailsContent> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 10),
+          // Cancel order button
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _onCancelOrder(context, ref),
+              icon: const Icon(Icons.cancel_outlined, size: 18),
+              label: const Text('CANCEL ORDER'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.error,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                side: const BorderSide(color: AppColors.error, width: 1.5),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
           ),
         ] else if (details.hasActiveOrder && isOwnedByAnotherCaptain) ...[
           // Another captain's order - no action buttons, just the warning above

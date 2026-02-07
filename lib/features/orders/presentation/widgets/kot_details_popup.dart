@@ -100,56 +100,180 @@ class _KotDetailsDialog extends ConsumerWidget {
 
   const _KotDetailsDialog({required this.kotId});
 
+  Color _statusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return AppColors.warning;
+      case 'accepted':
+        return AppColors.info;
+      case 'preparing':
+        return Colors.orange;
+      case 'ready':
+        return AppColors.success;
+      case 'served':
+        return AppColors.textSecondary;
+      case 'cancelled':
+        return AppColors.error;
+      default:
+        return AppColors.textSecondary;
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final detailsAsync = ref.watch(kotDetailProvider(kotId));
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 32),
       child: Container(
-        width: 460,
+        width: 620,
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.8,
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Header with close button
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: AppColors.border)),
-              ),
-              child: Row(
-                children: [
-                  const Text(
-                    'KOT Details',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
-            ),
-            // Content
-            Flexible(
-              child: detailsAsync.when(
-                data: (kot) => kot != null
-                    ? _KotDetailsContent(kot: kot, kotId: kotId)
-                    : const Center(child: Text('Failed to load KOT details')),
-                loading: () => const Padding(
-                  padding: EdgeInsets.all(40),
-                  child: LoadingIndicator(size: LoadingSize.large),
-                ),
-                error: (_, __) =>
-                    const Center(child: Text('Error loading KOT details')),
-              ),
+        decoration: BoxDecoration(
+          color: AppColors.scaffoldBackground,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.15),
+              blurRadius: 30,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
+        clipBehavior: Clip.antiAlias,
+        child: detailsAsync.when(
+          data: (kot) {
+            if (kot == null) {
+              return const SizedBox(
+                height: 200,
+                child: Center(child: Text('Failed to load KOT details')),
+              );
+            }
+            final color = _statusColor(kot.status);
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Colored header bar
+                _buildDialogHeader(context, kot, color),
+                // Content
+                Flexible(
+                  child: _KotDetailsContent(
+                    kot: kot,
+                    kotId: kotId,
+                    isDesktopDialog: true,
+                  ),
+                ),
+              ],
+            );
+          },
+          loading: () => const SizedBox(
+            height: 200,
+            child: Center(child: LoadingIndicator(size: LoadingSize.large)),
+          ),
+          error: (_, __) => const SizedBox(
+            height: 200,
+            child: Center(child: Text('Error loading KOT details')),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDialogHeader(BuildContext context, ApiKot kot, Color color) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 20, 16, 20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [color, color.withValues(alpha: 0.85)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Row(
+        children: [
+          // KOT number badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.25),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
+            ),
+            child: Text(
+              kot.kotNumber,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      kot.status.toUpperCase(),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    if (kot.priority > 0) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'HIGH PRIORITY',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${kot.station ?? 'Kitchen'} · ${kot.items.length} items · Order ${kot.orderNumber ?? '-'}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.white.withValues(alpha: 0.85),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Material(
+            color: Colors.white.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(8),
+            child: InkWell(
+              onTap: () => Navigator.of(context).pop(),
+              borderRadius: BorderRadius.circular(8),
+              child: const Padding(
+                padding: EdgeInsets.all(8),
+                child: Icon(Icons.close, color: Colors.white, size: 20),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -159,8 +283,13 @@ class _KotDetailsDialog extends ConsumerWidget {
 class _KotDetailsContent extends ConsumerStatefulWidget {
   final ApiKot kot;
   final int kotId;
+  final bool isDesktopDialog;
 
-  const _KotDetailsContent({required this.kot, required this.kotId});
+  const _KotDetailsContent({
+    required this.kot,
+    required this.kotId,
+    this.isDesktopDialog = false,
+  });
 
   @override
   ConsumerState<_KotDetailsContent> createState() => _KotDetailsContentState();
@@ -169,16 +298,19 @@ class _KotDetailsContent extends ConsumerStatefulWidget {
 class _KotDetailsContentState extends ConsumerState<_KotDetailsContent> {
   bool _isReprinting = false;
   StreamSubscription<Map<String, dynamic>>? _kotSub;
+  StreamSubscription<Map<String, dynamic>>? _itemCancelledSub;
 
   @override
   void initState() {
     super.initState();
     _listenToKotUpdates();
+    _listenToItemCancelled();
   }
 
   @override
   void dispose() {
     _kotSub?.cancel();
+    _itemCancelledSub?.cancel();
     super.dispose();
   }
 
@@ -188,7 +320,16 @@ class _KotDetailsContentState extends ConsumerState<_KotDetailsContent> {
       final kotId =
           data['kotId'] as int? ?? data['kot_id'] as int? ?? data['id'] as int?;
       if (kotId == widget.kotId) {
-        // Refresh the provider to get updated data
+        ref.invalidate(kotDetailProvider(widget.kotId));
+      }
+    });
+  }
+
+  void _listenToItemCancelled() {
+    final wsService = ref.read(webSocketServiceProvider);
+    _itemCancelledSub = wsService.kotItemCancelled.listen((data) {
+      final kotId = data['kotId'] as int? ?? data['kot_id'] as int?;
+      if (kotId == widget.kotId) {
         ref.invalidate(kotDetailProvider(widget.kotId));
       }
     });
@@ -259,9 +400,18 @@ class _KotDetailsContentState extends ConsumerState<_KotDetailsContent> {
     );
   }
 
+  bool get _isDesktop => widget.isDesktopDialog;
+
   @override
   Widget build(BuildContext context) {
     final kot = widget.kot;
+    if (_isDesktop) {
+      return _buildDesktopLayout(kot);
+    }
+    return _buildMobileLayout(kot);
+  }
+
+  Widget _buildMobileLayout(ApiKot kot) {
     final color = _statusColor(kot.status);
 
     return SingleChildScrollView(
@@ -296,6 +446,54 @@ class _KotDetailsContentState extends ConsumerState<_KotDetailsContent> {
           SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
         ],
       ),
+    );
+  }
+
+  Widget _buildDesktopLayout(ApiKot kot) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Row 1: Info + Timeline side by side
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: _buildInfoCard(kot)),
+                    const SizedBox(width: 16),
+                    Expanded(child: _buildTimelineCard(kot)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Items list full width
+                _buildItemsList(kot),
+
+                // Notes
+                if (kot.notes != null && kot.notes!.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  _buildNotesCard(kot),
+                ],
+              ],
+            ),
+          ),
+        ),
+        // Reprint button pinned at bottom
+        Container(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(
+              top: BorderSide(color: AppColors.border.withValues(alpha: 0.5)),
+            ),
+          ),
+          child: _buildReprintButton(kot),
+        ),
+      ],
     );
   }
 
@@ -365,38 +563,55 @@ class _KotDetailsContentState extends ConsumerState<_KotDetailsContent> {
     );
   }
 
-  Widget _buildInfoCard(ApiKot kot) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: const BoxDecoration(
-              color: AppColors.scaffoldBackground,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+  BoxDecoration get _cardDecoration => BoxDecoration(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(10),
+    border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+    boxShadow: _isDesktop
+        ? [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
-            child: const Row(
-              children: [
-                Icon(
-                  Icons.info_outline,
-                  size: 18,
-                  color: AppColors.textSecondary,
-                ),
-                SizedBox(width: 8),
-                Text(
-                  'KOT Information',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                ),
-              ],
+          ]
+        : null,
+  );
+
+  Widget _cardHeader(String title, IconData icon) {
+    return Container(
+      padding: EdgeInsets.all(_isDesktop ? 14 : 12),
+      decoration: BoxDecoration(
+        color: AppColors.scaffoldBackground,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+        border: Border(
+          bottom: BorderSide(color: AppColors.border.withValues(alpha: 0.3)),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: AppColors.textSecondary),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: _isDesktop ? 15 : 14,
+              fontWeight: FontWeight.w600,
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoCard(ApiKot kot) {
+    return Container(
+      decoration: _cardDecoration,
+      child: Column(
+        children: [
+          _cardHeader('KOT Information', Icons.info_outline),
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: EdgeInsets.all(_isDesktop ? 16 : 12),
             child: Column(
               children: [
                 _infoRow('Order #', kot.orderNumber ?? '-'),
@@ -472,40 +687,29 @@ class _KotDetailsContentState extends ConsumerState<_KotDetailsContent> {
     }
 
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.border),
-      ),
+      decoration: _cardDecoration,
       child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: const BoxDecoration(
-              color: AppColors.scaffoldBackground,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.timeline, size: 18, color: AppColors.textSecondary),
-                SizedBox(width: 8),
-                Text(
-                  'Timeline',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-          ),
+          _cardHeader('Timeline', Icons.timeline),
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: EdgeInsets.all(_isDesktop ? 16 : 12),
             child: Column(
               children: events
                   .map(
                     (e) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      padding: const EdgeInsets.symmetric(vertical: 6),
                       child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(e.icon, size: 16, color: e.color),
+                          Container(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: e.color.withValues(alpha: 0.12),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(e.icon, size: 14, color: e.color),
+                          ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Column(
@@ -518,6 +722,7 @@ class _KotDetailsContentState extends ConsumerState<_KotDetailsContent> {
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
+                                const SizedBox(height: 1),
                                 Text(
                                   e.time,
                                   style: const TextStyle(
@@ -542,39 +747,12 @@ class _KotDetailsContentState extends ConsumerState<_KotDetailsContent> {
 
   Widget _buildItemsList(ApiKot kot) {
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.border),
-      ),
+      decoration: _cardDecoration,
       child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: const BoxDecoration(
-              color: AppColors.scaffoldBackground,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.fastfood,
-                  size: 18,
-                  color: AppColors.textSecondary,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Items (${kot.items.length})',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          _cardHeader('Items (${kot.items.length})', Icons.fastfood),
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: EdgeInsets.all(_isDesktop ? 16 : 12),
             child: Column(
               children: kot.items.map((item) {
                 final itemStatusColor = _statusColor(item.status ?? kot.status);
@@ -699,8 +877,17 @@ class _KotDetailsContentState extends ConsumerState<_KotDetailsContent> {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.warning.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+        boxShadow: _isDesktop
+            ? [
+                BoxShadow(
+                  color: AppColors.warning.withValues(alpha: 0.06),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : null,
       ),
       padding: const EdgeInsets.all(12),
       child: Row(

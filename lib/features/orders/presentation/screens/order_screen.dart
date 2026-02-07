@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/constants.dart';
+import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/utils/responsive_utils.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../../../menu/data/models/menu_models.dart';
@@ -10,9 +11,12 @@ import '../../../layout/data/repositories/layout_repository.dart';
 import '../../../tables/data/models/table_details_model.dart';
 import '../../../tables/tables.dart';
 import '../../data/models/order_models.dart';
+import '../../data/repositories/order_repository.dart';
 import '../../domain/entities/order_item.dart';
 import '../providers/order_provider.dart';
 import '../providers/orders_provider.dart' as api;
+import '../widgets/cancel_item_dialog.dart';
+import '../widgets/cancel_order_dialog.dart';
 import '../widgets/widgets.dart';
 
 class OrderScreen extends ConsumerStatefulWidget {
@@ -81,24 +85,14 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
 
       final table = ref.read(tableProvider(widget.tableId));
       final user = ref.read(currentUserProvider);
-      final tableDetails = ref.read(currentTableDetailsProvider);
-      final existingOrder = ref.read(orderByTableProvider(widget.tableId));
 
-      // Priority: 1. API table details, 2. Local existing order, 3. Fetch details for occupied tables, 4. Create new
-      if (tableDetails != null && tableDetails.hasActiveOrder && user != null) {
-        // Load order from API table details (existing order with items)
-        _loadFromTableDetails(tableDetails, user);
-      } else if (existingOrder != null) {
-        // Try to parse API order ID from local order
-        _apiOrderId = int.tryParse(existingOrder.id);
-        ref.read(currentOrderProvider.notifier).loadOrder(existingOrder);
-      } else if (table != null &&
+      if (table != null &&
           user != null &&
           table.status != TableStatus.available &&
           table.status != TableStatus.cleaning &&
           table.status != TableStatus.blocked) {
-        // Table already has a session/order but no local data - fetch from API
-        // This happens on double-tap (skips popup, so no tableDetails)
+        // Always fetch fresh data from API for occupied/running/billing tables
+        // This avoids stale cached data from previous sessions
         _fetchAndLoadTableDetails(table, user);
       } else if (table != null && user != null) {
         // Available table - create new order
@@ -114,6 +108,9 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
         // Create API order in background
         _createApiOrder(table, user);
       }
+
+      // Clear cached table details (no longer needed)
+      ref.read(currentTableDetailsProvider.notifier).state = null;
     });
   }
 
@@ -339,19 +336,17 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final table = ref.watch(tableProvider(widget.tableId));
-
     return Scaffold(
       backgroundColor: AppColors.scaffoldBackground,
       body: ResponsiveLayout(
         mobile: _buildMobileLayout(),
         tablet: _buildTabletLayout(),
-        desktop: _buildDesktopLayout(table),
+        desktop: _buildDesktopLayout(),
       ),
     );
   }
 
-  Widget _buildDesktopLayout(table) {
+  Widget _buildDesktopLayout() {
     return Row(
       children: [
         // Left sidebar - Categories
@@ -435,7 +430,9 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
             onSave: () => _saveOrder(),
             onKot: () => _onGenerateKot(),
             onBill: () => _onGenerateBill(),
+            onCancelOrder: () => _onCancelOrder(),
             onItemTap: _onItemTap,
+            onItemCancel: _onCancelItem,
           ),
         ),
       ],
@@ -494,7 +491,9 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
             onSave: () => _saveOrder(),
             onKot: () => _onGenerateKot(),
             onBill: () => _onGenerateBill(),
+            onCancelOrder: () => _onCancelOrder(),
             onItemTap: _onItemTap,
+            onItemCancel: _onCancelItem,
           ),
         ),
       ],
@@ -502,12 +501,8 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
   }
 
   Widget _buildMobileLayout() {
-    final order = ref.watch(currentOrderProvider);
-    final table = ref.watch(tableProvider(widget.tableId));
-    final itemCount = order?.totalItems ?? 0;
-    final total = order?.grandTotal ?? 0;
-    final kotItemCount = order?.items.where((i) => !i.canModify).length ?? 0;
-    final pendingItemCount = order?.pendingItems.length ?? 0;
+    // Read table once for initial values - don't watch to avoid rebuilds
+    final table = ref.read(tableProvider(widget.tableId));
 
     return Scaffold(
       appBar: AppBar(
@@ -551,23 +546,30 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
           ],
         ),
         actions: [
-          if (itemCount > 0)
-            Container(
-              margin: const EdgeInsets.only(right: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.success,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '$itemCount',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+          // Item count badge - scoped Consumer to avoid full layout rebuild
+          Consumer(
+            builder: (context, ref, _) {
+              final itemCount =
+                  ref.watch(currentOrderProvider)?.totalItems ?? 0;
+              if (itemCount <= 0) return const SizedBox.shrink();
+              return Container(
+                margin: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.success,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              ),
-            ),
+                child: Text(
+                  '$itemCount',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.person_add_outlined, size: 20),
             onPressed: () => _showCustomerDialogMobile(context),
@@ -626,14 +628,25 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
               _buildFilterChips(),
               // Menu grid
               Expanded(child: _buildMenuGrid()),
-              // Order summary bar
-              if (kotItemCount > 0 || pendingItemCount > 0)
-                _MobileOrderSummaryBar(
-                  kotItemCount: kotItemCount,
-                  pendingItemCount: pendingItemCount,
-                  total: total,
-                  onViewOrder: _showOrderSheet,
-                ),
+              // Order summary bar - scoped Consumer to avoid full layout rebuild
+              Consumer(
+                builder: (context, ref, _) {
+                  final order = ref.watch(currentOrderProvider);
+                  final kotItemCount =
+                      order?.items.where((i) => !i.canModify).length ?? 0;
+                  final pendingItemCount = order?.pendingItems.length ?? 0;
+                  final total = order?.grandTotal ?? 0;
+                  if (kotItemCount <= 0 && pendingItemCount <= 0) {
+                    return const SizedBox.shrink();
+                  }
+                  return _MobileOrderSummaryBar(
+                    kotItemCount: kotItemCount,
+                    pendingItemCount: pendingItemCount,
+                    total: total,
+                    onViewOrder: _showOrderSheet,
+                  );
+                },
+              ),
             ],
           ),
           // Collapsible category sidebar overlay
@@ -1009,9 +1022,17 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
             Navigator.pop(sheetContext);
             _onGenerateBill();
           },
+          onCancelOrder: () {
+            Navigator.pop(sheetContext);
+            _onCancelOrder();
+          },
           onItemTap: (item) {
             Navigator.pop(sheetContext);
             _onItemTap(item);
+          },
+          onItemCancel: (item) {
+            Navigator.pop(sheetContext);
+            _onCancelItem(item);
           },
         ),
       ),
@@ -1102,6 +1123,135 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
   void _onGenerateBill() {
     // TODO: Implement bill generation API
     Toast.info(context, 'Bill generation coming soon');
+  }
+
+  Future<void> _onCancelItem(OrderItem item) async {
+    final outletId = ApiEndpoints.defaultOutletId;
+
+    final result = await showCancelItemDialog(
+      context,
+      item: item,
+      outletId: outletId,
+    );
+
+    if (result == null || !mounted) return;
+
+    // Call API to cancel item
+    final apiItemId = int.tryParse(item.id);
+    if (apiItemId == null) {
+      Toast.error(context, 'Invalid item ID');
+      return;
+    }
+
+    final apiResult = await ref
+        .read(orderRepositoryProvider)
+        .cancelItem(
+          orderItemId: apiItemId,
+          reason: result.reason,
+          reasonId: result.reasonId,
+          quantity: result.quantity,
+        );
+
+    if (!mounted) return;
+
+    apiResult.when(
+      success: (_, __) {
+        // Optimistic local update
+        ref
+            .read(currentOrderProvider.notifier)
+            .cancelItem(item.id, cancelQuantity: result.quantity);
+        Toast.success(context, '${item.name} cancelled');
+
+        // Re-fetch full table details from API to get accurate server totals
+        _reloadOrderFromApi();
+      },
+      failure: (message, _, __) {
+        Toast.error(context, 'Failed to cancel: $message');
+      },
+    );
+  }
+
+  /// Re-fetch table details from API and reload order with accurate server data
+  Future<void> _reloadOrderFromApi() async {
+    final tableId = int.tryParse(widget.tableId);
+    if (tableId == null) return;
+
+    final layoutRepo = ref.read(layoutRepositoryProvider);
+    final result = await layoutRepo.getTableDetails(tableId);
+    if (!mounted) return;
+
+    result.whenOrNull(
+      success: (details, _) {
+        if (details.order != null) {
+          final user = ref.read(currentUserProvider);
+          ref
+              .read(currentOrderProvider.notifier)
+              .loadOrderFromTableDetails(
+                tableDetails: details,
+                captainId: user?.id.toString() ?? '',
+                captainName: user?.name ?? '',
+              );
+          setState(() {
+            _apiOrderId = details.order!.id;
+          });
+        }
+      },
+    );
+  }
+
+  Future<void> _onCancelOrder() async {
+    final order = ref.read(currentOrderProvider);
+    if (order == null || _apiOrderId == null) return;
+
+    final outletId = ApiEndpoints.defaultOutletId;
+
+    final result = await showCancelOrderDialog(
+      context,
+      orderNumber: order.id.length > 6
+          ? order.id.substring(0, 6).toUpperCase()
+          : order.id.toUpperCase(),
+      outletId: outletId,
+      orderTotal: order.grandTotal,
+      itemCount: order.totalItems,
+    );
+
+    if (result == null || !mounted) return;
+
+    // Call API to cancel order
+    final apiResult = await ref
+        .read(orderRepositoryProvider)
+        .cancelOrder(
+          orderId: _apiOrderId!,
+          reason: result.reason,
+          reasonId: result.reasonId,
+        );
+
+    if (!mounted) return;
+
+    apiResult.when(
+      success: (_, __) {
+        Toast.success(context, 'Order cancelled');
+
+        // Clear local order state
+        ref.read(currentOrderProvider.notifier).clearOrder();
+
+        // Update table status to available/cleaning
+        ref
+            .read(tablesProvider.notifier)
+            .updateTableStatus(widget.tableId, TableStatus.available);
+
+        // Refresh tables to get fresh data
+        ref.read(tablesProvider.notifier).refresh();
+
+        // Navigate back to table view
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+      },
+      failure: (message, _, __) {
+        Toast.error(context, 'Failed to cancel order: $message');
+      },
+    );
   }
 
   void _onItemTap(OrderItem item) {

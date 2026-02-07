@@ -8,6 +8,7 @@ class OrderItemTile extends StatelessWidget {
   final VoidCallback? onDecrement;
   final VoidCallback? onRemove;
   final VoidCallback? onTap;
+  final VoidCallback? onCancel;
   final bool showKotInfo;
 
   const OrderItemTile({
@@ -17,6 +18,7 @@ class OrderItemTile extends StatelessWidget {
     this.onDecrement,
     this.onRemove,
     this.onTap,
+    this.onCancel,
     this.showKotInfo = true,
   });
 
@@ -30,7 +32,9 @@ class OrderItemTile extends StatelessWidget {
           vertical: AppSpacing.xs,
         ),
         decoration: BoxDecoration(
-          color: item.hasKot
+          color: item.status == OrderItemStatus.cancelled
+              ? AppColors.error.withValues(alpha: 0.05)
+              : item.hasKot
               ? AppColors.success.withValues(alpha: 0.05)
               : Colors.transparent,
           border: Border(
@@ -52,6 +56,33 @@ class OrderItemTile extends StatelessWidget {
                         Icons.close,
                         size: 16,
                         color: AppColors.error,
+                      ),
+                    ),
+                  )
+                else if (item.status == OrderItemStatus.cancelled)
+                  Tooltip(
+                    message: 'Item cancelled',
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      child: Icon(
+                        Icons.cancel,
+                        size: 14,
+                        color: AppColors.error.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  )
+                else if (onCancel != null)
+                  GestureDetector(
+                    onTap: onCancel,
+                    child: Tooltip(
+                      message: 'Cancel item',
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        child: Icon(
+                          Icons.cancel_outlined,
+                          size: 16,
+                          color: AppColors.error.withValues(alpha: 0.7),
+                        ),
                       ),
                     ),
                   )
@@ -78,9 +109,16 @@ class OrderItemTile extends StatelessWidget {
                         item.variantName != null
                             ? '${item.name} (${item.variantName})'
                             : item.name,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
+                          decoration: item.status == OrderItemStatus.cancelled
+                              ? TextDecoration.lineThrough
+                              : null,
+                          decorationColor: AppColors.error,
+                          color: item.status == OrderItemStatus.cancelled
+                              ? AppColors.textSecondary
+                              : null,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -88,9 +126,12 @@ class OrderItemTile extends StatelessWidget {
                       if (item.addons.isNotEmpty)
                         Text(
                           item.addons.map((a) => a.name).join(', '),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
                             color: AppColors.textSecondary,
+                            decoration: item.status == OrderItemStatus.cancelled
+                                ? TextDecoration.lineThrough
+                                : null,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -113,9 +154,16 @@ class OrderItemTile extends StatelessWidget {
                         alignment: Alignment.center,
                         child: Text(
                           '${item.quantity}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
+                            decoration: item.status == OrderItemStatus.cancelled
+                                ? TextDecoration.lineThrough
+                                : null,
+                            decorationColor: AppColors.error,
+                            color: item.status == OrderItemStatus.cancelled
+                                ? AppColors.textSecondary
+                                : null,
                           ),
                         ),
                       ),
@@ -134,17 +182,27 @@ class OrderItemTile extends StatelessWidget {
                     children: [
                       Text(
                         '₹${item.itemTotal.toStringAsFixed(0)}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
+                          decoration: item.status == OrderItemStatus.cancelled
+                              ? TextDecoration.lineThrough
+                              : null,
+                          decorationColor: AppColors.error,
+                          color: item.status == OrderItemStatus.cancelled
+                              ? AppColors.textSecondary
+                              : null,
                         ),
                       ),
                       if (item.quantity > 1)
                         Text(
                           '₹${item.unitPrice.toStringAsFixed(0)}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 10,
                             color: AppColors.textSecondary,
+                            decoration: item.status == OrderItemStatus.cancelled
+                                ? TextDecoration.lineThrough
+                                : null,
                           ),
                         ),
                     ],

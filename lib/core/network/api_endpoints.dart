@@ -2,7 +2,7 @@ class ApiEndpoints {
   ApiEndpoints._();
 
   static const String baseUrl =
-      "https://older-charging-dublin-signatures.trycloudflare.com/api/v1";
+      "https://carrier-symbols-exports-surround.trycloudflare.com/api/v1";
 
   // Default outlet ID
   static const int defaultOutletId = 4;
@@ -58,8 +58,9 @@ class ApiEndpoints {
       "/orders/items/$orderItemId/quantity";
   static String cancelItem(int orderItemId) =>
       "/orders/items/$orderItemId/cancel";
-  static String cancelReasons(int outletId) =>
-      "/orders/cancel-reasons/$outletId";
+  static String cancelReasons(int outletId, {String? type}) =>
+      "/orders/cancel-reasons/$outletId${type != null ? '?type=$type' : ''}";
+  static String cancelOrder(int orderId) => "/orders/$orderId/cancel";
   static String transferOrder(int orderId) => "/orders/$orderId/transfer";
 
   // ============ KOT ============

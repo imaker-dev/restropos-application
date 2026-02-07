@@ -168,12 +168,14 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
   Future<ApiResult<ApiOrderItem>> cancelItem({
     required int orderItemId,
     required String reason,
-    int? cancelReasonId,
+    int? reasonId,
+    required int quantity,
   }) async {
     return _repository.cancelItem(
       orderItemId: orderItemId,
       reason: reason,
-      cancelReasonId: cancelReasonId,
+      reasonId: reasonId,
+      quantity: quantity,
     );
   }
 

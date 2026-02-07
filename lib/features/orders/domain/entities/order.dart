@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 import 'order_item.dart';
 
 enum OrderType { dineIn, delivery, pickUp }
+
 enum OrderStatus { active, completed, cancelled }
 
 class Order extends Equatable {
@@ -53,16 +54,20 @@ class Order extends Equatable {
 
   bool get isEmpty => items.isEmpty;
   bool get isActive => status == OrderStatus.active;
-  int get totalItems => items.fold(0, (sum, item) => sum + item.quantity);
-  
+  int get totalItems => activeItems.fold(0, (sum, item) => sum + item.quantity);
+  List<OrderItem> get activeItems =>
+      items.where((i) => i.status != OrderItemStatus.cancelled).toList();
+
   List<OrderItem> get pendingItems => items.where((i) => i.isPending).toList();
   List<OrderItem> get kotItems => items.where((i) => i.hasKot).toList();
-  
+
   bool get hasPendingItems => pendingItems.isNotEmpty;
   bool get hasKotItems => kotItems.isNotEmpty;
 
   double calculateSubtotal() {
-    return items.fold(0, (sum, item) => sum + item.itemTotal);
+    return items
+        .where((item) => item.status != OrderItemStatus.cancelled)
+        .fold(0, (sum, item) => sum + item.itemTotal);
   }
 
   Order recalculate({
@@ -74,7 +79,9 @@ class Order extends Equatable {
     final newSubtotal = calculateSubtotal();
     final newTax = includeTaxAndCharges ? newSubtotal * taxRate : 0.0;
     final newDiscount = discount ?? discountAmount;
-    final newServiceCharge = includeTaxAndCharges ? newSubtotal * serviceChargeRate : 0.0;
+    final newServiceCharge = includeTaxAndCharges
+        ? newSubtotal * serviceChargeRate
+        : 0.0;
     final total = newSubtotal + newTax + newServiceCharge - newDiscount;
     final roundedTotal = (total).round().toDouble();
     final newRoundOff = roundedTotal - total;
@@ -173,9 +180,11 @@ class Order extends Equatable {
       (e) => e.name == json['status'],
       orElse: () => OrderStatus.active,
     ),
-    items: (json['items'] as List<dynamic>?)
-        ?.map((i) => OrderItem.fromJson(i as Map<String, dynamic>))
-        .toList() ?? [],
+    items:
+        (json['items'] as List<dynamic>?)
+            ?.map((i) => OrderItem.fromJson(i as Map<String, dynamic>))
+            .toList() ??
+        [],
     customerId: json['customerId'] as String?,
     customerName: json['customerName'] as String?,
     customerPhone: json['customerPhone'] as String?,
@@ -195,8 +204,26 @@ class Order extends Equatable {
 
   @override
   List<Object?> get props => [
-    id, tableId, tableName, type, status, items, customerId, customerName,
-    customerPhone, guestCount, captainId, captainName, subtotal, taxAmount,
-    discountAmount, serviceCharge, roundOff, grandTotal, notes, createdAt, updatedAt,
+    id,
+    tableId,
+    tableName,
+    type,
+    status,
+    items,
+    customerId,
+    customerName,
+    customerPhone,
+    guestCount,
+    captainId,
+    captainName,
+    subtotal,
+    taxAmount,
+    discountAmount,
+    serviceCharge,
+    roundOff,
+    grandTotal,
+    notes,
+    createdAt,
+    updatedAt,
   ];
 }

@@ -458,13 +458,19 @@ class UpdateQuantityRequest {
 
 class CancelItemRequest {
   final String reason;
-  final int? cancelReasonId;
+  final int? reasonId;
+  final int quantity;
 
-  const CancelItemRequest({required this.reason, this.cancelReasonId});
+  const CancelItemRequest({
+    required this.reason,
+    this.reasonId,
+    required this.quantity,
+  });
 
   Map<String, dynamic> toJson() => {
     'reason': reason,
-    if (cancelReasonId != null) 'cancelReasonId': cancelReasonId,
+    if (reasonId != null) 'reasonId': reasonId,
+    'quantity': quantity,
   };
 }
 
@@ -496,6 +502,44 @@ class CancelReason {
       code: json['code'] as String? ?? '',
       label: json['label'] as String? ?? '',
       requiresNote: json['requiresNote'] as bool? ?? false,
+    );
+  }
+}
+
+/// Cancel reason from API - matches GET /orders/cancel-reasons/{outletId}
+class ApiCancelReason {
+  final int id;
+  final int outletId;
+  final String reasonType;
+  final String reason;
+  final bool requiresApproval;
+  final bool isActive;
+  final int displayOrder;
+
+  const ApiCancelReason({
+    required this.id,
+    required this.outletId,
+    required this.reasonType,
+    required this.reason,
+    this.requiresApproval = false,
+    this.isActive = true,
+    this.displayOrder = 0,
+  });
+
+  factory ApiCancelReason.fromJson(Map<String, dynamic> json) {
+    return ApiCancelReason(
+      id: json['id'] as int? ?? 0,
+      outletId: (json['outlet_id'] ?? json['outletId']) as int? ?? 0,
+      reasonType: (json['reason_type'] ?? json['reasonType']) as String? ?? '',
+      reason: json['reason'] as String? ?? '',
+      requiresApproval:
+          (json['requires_approval'] ?? json['requiresApproval']) == 1 ||
+          (json['requires_approval'] ?? json['requiresApproval']) == true,
+      isActive:
+          (json['is_active'] ?? json['isActive']) == 1 ||
+          (json['is_active'] ?? json['isActive']) == true,
+      displayOrder:
+          (json['display_order'] ?? json['displayOrder']) as int? ?? 0,
     );
   }
 }

@@ -12,6 +12,7 @@ class SocketEvents {
   static const String tableUpdated = 'table:updated';
   static const String orderUpdated = 'order:updated';
   static const String kotUpdated = 'kot:updated';
+  static const String kotItemCancelled = 'kot:item_cancelled';
   static const String itemReady = 'item:ready';
   static const String billStatus = 'bill:status';
   static const String billGenerated = 'bill:generated';
@@ -49,6 +50,8 @@ class WebSocketService {
       StreamController<Map<String, dynamic>>.broadcast();
   final _kotUpdateController =
       StreamController<Map<String, dynamic>>.broadcast();
+  final _kotItemCancelledController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   // Public streams
   Stream<SocketState> get stateStream => _stateController.stream;
@@ -59,6 +62,8 @@ class WebSocketService {
   Stream<Map<String, dynamic>> get billStatus => _billStatusController.stream;
   Stream<Map<String, dynamic>> get itemReady => _itemReadyController.stream;
   Stream<Map<String, dynamic>> get kotUpdates => _kotUpdateController.stream;
+  Stream<Map<String, dynamic>> get kotItemCancelled =>
+      _kotItemCancelledController.stream;
 
   SocketState get state => _state;
   bool get isConnected => _state == SocketState.connected;
@@ -202,6 +207,19 @@ class WebSocketService {
         debugPrint('[WebSocket] Error handling kot:updated: $e');
       }
     });
+
+    // KOT item cancelled
+    _socket?.on(SocketEvents.kotItemCancelled, (data) {
+      debugPrint('[WebSocket] kot:item_cancelled received: $data');
+      try {
+        if (data != null) {
+          final mapData = Map<String, dynamic>.from(data as Map);
+          _kotItemCancelledController.add(mapData);
+        }
+      } catch (e) {
+        debugPrint('[WebSocket] Error handling kot:item_cancelled: $e');
+      }
+    });
   }
 
   /// Re-join all rooms after connection/reconnection
@@ -337,6 +355,7 @@ class WebSocketService {
     _billStatusController.close();
     _itemReadyController.close();
     _kotUpdateController.close();
+    _kotItemCancelledController.close();
   }
 }
 
@@ -385,4 +404,9 @@ final itemReadyProvider = StreamProvider<Map<String, dynamic>>((ref) {
 final kotUpdatesProvider = StreamProvider<Map<String, dynamic>>((ref) {
   final service = ref.watch(webSocketServiceProvider);
   return service.kotUpdates;
+});
+
+final kotItemCancelledProvider = StreamProvider<Map<String, dynamic>>((ref) {
+  final service = ref.watch(webSocketServiceProvider);
+  return service.kotItemCancelled;
 });

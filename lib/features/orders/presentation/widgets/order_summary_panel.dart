@@ -9,14 +9,18 @@ class OrderSummaryPanel extends ConsumerWidget {
   final VoidCallback? onSave;
   final VoidCallback? onKot;
   final VoidCallback? onBill;
+  final VoidCallback? onCancelOrder;
   final Function(OrderItem item)? onItemTap;
+  final Function(OrderItem item)? onItemCancel;
 
   const OrderSummaryPanel({
     super.key,
     this.onSave,
     this.onKot,
     this.onBill,
+    this.onCancelOrder,
     this.onItemTap,
+    this.onItemCancel,
   });
 
   @override
@@ -193,6 +197,19 @@ class OrderSummaryPanel extends ConsumerWidget {
               constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
               tooltip: order.notes != null ? 'Edit Note' : 'Add Note',
             ),
+            // Cancel order icon
+            if (onCancelOrder != null && order.hasKotItems)
+              IconButton(
+                icon: const Icon(
+                  Icons.cancel_outlined,
+                  size: 18,
+                  color: AppColors.error,
+                ),
+                onPressed: onCancelOrder,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                tooltip: 'Cancel Order',
+              ),
             // Refresh icon
             IconButton(
               icon: const Icon(Icons.refresh, size: 18),
@@ -490,6 +507,11 @@ class OrderSummaryPanel extends ConsumerWidget {
             (item) => OrderItemTile(
               item: item,
               onTap: onItemTap != null ? () => onItemTap!(item) : null,
+              onCancel:
+                  onItemCancel != null &&
+                      item.status != OrderItemStatus.cancelled
+                  ? () => onItemCancel!(item)
+                  : null,
             ),
           ),
         ],
@@ -531,6 +553,7 @@ class OrderSummaryPanel extends ConsumerWidget {
   }
 
   Widget _buildTotalBar(Order order) {
+    final hasTax = order.taxAmount > 0;
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.sm,
@@ -546,22 +569,25 @@ class OrderSummaryPanel extends ConsumerWidget {
           color: AppColors.primary,
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              children: [
-                const Icon(Icons.receipt_long, size: 18, color: Colors.white),
-                const SizedBox(width: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            // Subtotal + Tax row (only when tax exists)
+            if (hasTax)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Total',
-                      style: TextStyle(fontSize: 11, color: Colors.white70),
+                    Text(
+                      'Subtotal: \u20b9${order.subtotal.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: Colors.white60,
+                      ),
                     ),
                     Text(
-                      '${order.totalItems} items',
+                      'Tax: \u20b9${order.taxAmount.toStringAsFixed(2)}',
                       style: const TextStyle(
                         fontSize: 10,
                         color: Colors.white60,
@@ -569,15 +595,46 @@ class OrderSummaryPanel extends ConsumerWidget {
                     ),
                   ],
                 ),
-              ],
-            ),
-            Text(
-              '\u20b9${order.grandTotal.toStringAsFixed(0)}',
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
               ),
+            // Total row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.receipt_long,
+                      size: 18,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Total',
+                          style: TextStyle(fontSize: 11, color: Colors.white70),
+                        ),
+                        Text(
+                          '${order.totalItems} items',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.white60,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                Text(
+                  '\u20b9${order.grandTotal.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
             ),
           ],
         ),

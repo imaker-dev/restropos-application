@@ -70,6 +70,10 @@ class CurrentOrderNotifier extends StateNotifier<Order?> {
     state = order;
   }
 
+  void clearOrder() {
+    state = null;
+  }
+
   /// Load order from API table details response
   void loadOrderFromTableDetails({
     required TableDetailsResponse tableDetails,
@@ -136,6 +140,7 @@ class CurrentOrderNotifier extends StateNotifier<Order?> {
       case 'pending':
       case 'kot_generated':
       case 'sent':
+      case 'sent_to_kitchen':
         return OrderItemStatus.kotGenerated;
       case 'preparing':
       case 'accepted':
@@ -272,6 +277,27 @@ class CurrentOrderNotifier extends StateNotifier<Order?> {
     if (!item.canModify) return;
 
     final updatedItems = state!.items.where((i) => i.id != itemId).toList();
+    state = state!.copyWith(items: updatedItems).recalculate();
+  }
+
+  /// Cancel an item (full or partial quantity)
+  void cancelItem(String itemId, {int? cancelQuantity}) {
+    if (state == null) return;
+
+    final updatedItems = state!.items.map((item) {
+      if (item.id == itemId) {
+        final qtyToCancel = cancelQuantity ?? item.quantity;
+        if (qtyToCancel >= item.quantity) {
+          // Full cancel
+          return item.copyWith(status: OrderItemStatus.cancelled);
+        } else {
+          // Partial cancel - reduce quantity
+          return item.copyWith(quantity: item.quantity - qtyToCancel);
+        }
+      }
+      return item;
+    }).toList();
+
     state = state!.copyWith(items: updatedItems).recalculate();
   }
 

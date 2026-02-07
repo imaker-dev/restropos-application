@@ -395,6 +395,8 @@ class TableKot {
   final String status;
   final String? station;
   final int itemCount;
+  final int totalItemCount;
+  final int cancelledItemCount;
   final int priority;
   final String?
   acceptedBy; // Changed from int? to String? to match API (returns name, not ID)
@@ -409,6 +411,8 @@ class TableKot {
     required this.status,
     this.station,
     this.itemCount = 0,
+    this.totalItemCount = 0,
+    this.cancelledItemCount = 0,
     this.priority = 0,
     this.acceptedBy,
     this.acceptedAt,
@@ -424,6 +428,8 @@ class TableKot {
       status: json['status'] as String? ?? 'pending',
       station: json['station'] as String?,
       itemCount: json['itemCount'] as int? ?? 0,
+      totalItemCount: json['totalItemCount'] as int? ?? 0,
+      cancelledItemCount: json['cancelledItemCount'] as int? ?? 0,
       priority: json['priority'] as int? ?? 0,
       acceptedBy:
           json['acceptedBy'] as String?, // Parse as String (captain name)
@@ -445,7 +451,9 @@ class TableKot {
   bool get isPending => status == 'pending';
   bool get isReady => status == 'ready';
   bool get isServed => status == 'served';
+  bool get isCancelled => status == 'cancelled';
   bool get isAccepted => acceptedBy != null;
+  bool get hasCancelledItems => cancelledItemCount > 0;
 }
 
 class TableBilling {

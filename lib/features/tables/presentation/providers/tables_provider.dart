@@ -111,10 +111,32 @@ final tablesProvider = StateNotifierProvider<TablesNotifier, TablesState>((
     },
   );
 
+  // Subscribe to WebSocket KOT updates (KOT status change can affect table status)
+  final kotSubscription = ref.listen<AsyncValue<Map<String, dynamic>>>(
+    kotUpdatesProvider,
+    (previous, next) {
+      next.whenData((data) {
+        notifier.handleKotUpdate(data);
+      });
+    },
+  );
+
+  // Subscribe to WebSocket KOT item cancelled updates
+  final kotCancelSubscription = ref.listen<AsyncValue<Map<String, dynamic>>>(
+    kotItemCancelledProvider,
+    (previous, next) {
+      next.whenData((data) {
+        notifier.handleKotUpdate(data);
+      });
+    },
+  );
+
   ref.onDispose(() {
     tableSubscription.close();
     orderSubscription.close();
     billSubscription.close();
+    kotSubscription.close();
+    kotCancelSubscription.close();
   });
 
   return notifier;
@@ -526,9 +548,12 @@ class TablesNotifier extends StateNotifier<TablesState> {
       return;
     }
 
-    // If still no status, skip update
+    // If still no status, do a silent background refresh
     if (newStatus == null) {
-      debugPrint('[TablesNotifier] No status could be determined, skipping');
+      debugPrint(
+        '[TablesNotifier] No status could be determined, doing silent refresh',
+      );
+      _silentRefresh();
       return;
     }
 
@@ -738,6 +763,19 @@ class TablesNotifier extends StateNotifier<TablesState> {
     }
   }
 
+  /// Handle kot:updated or kot:item_cancelled WebSocket event
+  /// KOT status changes don't change table status or running total.
+  /// The order:updated and table:updated events handle those separately.
+  /// So we just log and skip - no refresh needed.
+  void handleKotUpdate(Map<String, dynamic> data) {
+    final tableId = data['tableId']?.toString() ?? data['table_id']?.toString();
+    if (tableId != null) {
+      debugPrint(
+        '[TablesNotifier] KOT update for table $tableId - no table refresh needed',
+      );
+    }
+  }
+
   /// Handle table:updated WebSocket event (legacy format)
   /// Payload: { tableId, tableNumber, oldStatus, newStatus, changedBy, timestamp }
   void handleTableUpdatedEvent(Map<String, dynamic> data) {
@@ -763,11 +801,29 @@ class TablesNotifier extends StateNotifier<TablesState> {
     }
   }
 
-  Future<void> refresh() async {
-    // Reload tables from API using current floor
+  /// Silent refresh - fetches fresh data from API without setting isLoading
+  /// to avoid UI flash. Used for background WebSocket-triggered refreshes.
+  Future<void> _silentRefresh() async {
+    if (_repository == null) return;
     final currentFloor = state.currentFloorId;
-    if (currentFloor != null) {
-      await loadTablesByFloorDetails(currentFloor);
-    }
+    if (currentFloor == null) return;
+
+    final result = await _repository.getFloorDetails(currentFloor);
+    result.whenOrNull(
+      success: (floor, _) {
+        final apiTables = floor.tables ?? [];
+        final tables = apiTables.map((t) => _mapApiTableToEntity(t)).toList();
+        state = state.copyWith(
+          tables: tables,
+          isLoading: false,
+          currentFloorId: currentFloor,
+        );
+      },
+    );
+  }
+
+  Future<void> refresh() async {
+    // Reload tables from API using current floor (silent - no isLoading flash)
+    await _silentRefresh();
   }
 }

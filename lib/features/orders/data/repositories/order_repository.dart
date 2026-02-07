@@ -102,11 +102,13 @@ class OrderRepository {
   Future<ApiResult<ApiOrderItem>> cancelItem({
     required int orderItemId,
     required String reason,
-    int? cancelReasonId,
+    int? reasonId,
+    required int quantity,
   }) async {
     final request = CancelItemRequest(
       reason: reason,
-      cancelReasonId: cancelReasonId,
+      reasonId: reasonId,
+      quantity: quantity,
     );
     return _api.post(
       ApiEndpoints.cancelItem(orderItemId),
@@ -115,7 +117,44 @@ class OrderRepository {
     );
   }
 
-  /// Get cancel reasons
+  /// Get cancel reasons for item cancellation
+  Future<ApiResult<List<ApiCancelReason>>> getItemCancelReasons(
+    int outletId,
+  ) async {
+    return _api.getList(
+      ApiEndpoints.cancelReasons(outletId, type: 'item_cancel'),
+      parser: ApiCancelReason.fromJson,
+    );
+  }
+
+  /// Cancel an entire order
+  Future<ApiResult<ApiOrder>> cancelOrder({
+    required int orderId,
+    required String reason,
+    int? reasonId,
+  }) async {
+    final request = CancelOrderRequest(
+      reason: reason,
+      cancelReasonId: reasonId,
+    );
+    return _api.post(
+      ApiEndpoints.cancelOrder(orderId),
+      data: request.toJson(),
+      parser: (json) => ApiOrder.fromJson(json as Map<String, dynamic>),
+    );
+  }
+
+  /// Get cancel reasons for order cancellation
+  Future<ApiResult<List<ApiCancelReason>>> getOrderCancelReasons(
+    int outletId,
+  ) async {
+    return _api.getList(
+      ApiEndpoints.cancelReasons(outletId, type: 'order_cancel'),
+      parser: ApiCancelReason.fromJson,
+    );
+  }
+
+  /// Get cancel reasons (generic)
   Future<ApiResult<List<CancelReason>>> getCancelReasons(int outletId) async {
     return _api.getList(
       ApiEndpoints.cancelReasons(outletId),
