@@ -77,7 +77,7 @@ class OrderHistoryScreen extends ConsumerWidget {
                 ),
               ),
 
-            // // Summary Section
+            // Summary Section
             // if (summary != null)
             //   SliverToBoxAdapter(
             //     child: _buildSummarySection(summary),
@@ -85,15 +85,20 @@ class OrderHistoryScreen extends ConsumerWidget {
 
             // Search Bar
             SliverToBoxAdapter(
-              child: _buildSearchBar(searchController, onSearchChanged),
+              child: Consumer(
+                builder: (context, ref, child) {
+                  final orderHistoryState = ref.watch(orderHistoryProvider);
+                  return _buildSearchBar(searchController, onSearchChanged, context, orderHistoryState, ref);
+                },
+              ),
             ),
 
-            // Compact Filter Button
+            // Order Status Tabs
             SliverToBoxAdapter(
               child: Consumer(
                 builder: (context, ref, child) {
                   final orderHistoryState = ref.watch(orderHistoryProvider);
-                  return _buildCompactFilterButton(context, orderHistoryState, ref, searchController);
+                  return _buildOrderStatusTabs(orderHistoryState, ref, searchController);
                 },
               ),
             ),
@@ -289,7 +294,7 @@ class OrderHistoryScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSearchBar(TextEditingController searchController, Function(String) onSearchChanged) {
+  Widget _buildSearchBar(TextEditingController searchController, Function(String) onSearchChanged, BuildContext context, OrderHistoryState state, WidgetRef ref) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       child: Container(
@@ -313,15 +318,23 @@ class OrderHistoryScreen extends ConsumerWidget {
                 hintText: 'Search by order/table/customer/phone...',
                 hintStyle: AppTextStyles.textSecondary14Regular,
                 prefixIcon: Icon(Icons.search_rounded, color: AppColors.textSecondary),
-                suffixIcon: value.text.isNotEmpty
-                    ? IconButton(
-                  icon: Icon(Icons.clear, color: AppColors.textSecondary),
-                  onPressed: () {
-                    searchController.clear();
-                    onSearchChanged('');
-                  },
-                )
-                    : null,
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (value.text.isNotEmpty)
+                      IconButton(
+                        icon: Icon(Icons.clear, color: AppColors.textSecondary),
+                        onPressed: () {
+                          searchController.clear();
+                          onSearchChanged('');
+                        },
+                      ),
+                    IconButton(
+                      icon: Icon(Icons.tune_rounded, color: AppColors.primary),
+                      onPressed: () => _showNewFilterBottomSheet(context, state, ref, searchController),
+                    ),
+                  ],
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
@@ -336,136 +349,54 @@ class OrderHistoryScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildCompactFilterButton(
-      BuildContext context,
-      OrderHistoryState state,
-      WidgetRef ref,
-      TextEditingController searchController,
-      ) {
-    // Count active filters
-    int activeFiltersCount = 0;
-    if (state.selectedStatus != null) activeFiltersCount++;
-    if (state.fromDate != null || state.toDate != null) activeFiltersCount++;
-
+  Widget _buildOrderStatusTabs(OrderHistoryState state, WidgetRef ref, TextEditingController searchController) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      child: Row(
-        children: [
-          // Filter Button
-          Expanded(
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () => _showFilterBottomSheet(context, state, ref, searchController),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: activeFiltersCount > 0
-                          ? AppColors.primary
-                          : AppColors.border,
-                      width: activeFiltersCount > 0 ? 2 : 1,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: activeFiltersCount > 0
-                            ? AppColors.primary.withValues(alpha: 0.1)
-                            : Colors.black.withValues(alpha: 0.03),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: activeFiltersCount > 0
-                              ? AppColors.primary
-                              : AppColors.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          Icons.tune_rounded,
-                          color: activeFiltersCount > 0
-                              ? AppColors.textOnPrimary
-                              : AppColors.primary,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Filters & Sorting',
-                              style: AppTextStyles.primary14SemiBold,
-                            ),
-                            if (activeFiltersCount > 0) ...[
-                              const SizedBox(height: 2),
-                              Text(
-                                '$activeFiltersCount filter${activeFiltersCount > 1 ? 's' : ''} active',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.primary,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        color: AppColors.textSecondary,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _buildModernChip(
+              'All',
+              state.selectedStatus == null,
+                  () {
+                searchController.clear();
+                ref.read(orderHistoryProvider.notifier).clearFilters();
+              },
+              AppColors.primary,
+              Icons.apps_rounded,
             ),
-          ),
-
-          // Clear All Button (if filters active)
-          if (activeFiltersCount > 0) ...[
             const SizedBox(width: 8),
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () {
-                  searchController.clear();
-                  ref.read(orderHistoryProvider.notifier).clearFilters();
-                },
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppColors.error.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppColors.error.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.clear_all_rounded,
-                    color: AppColors.error,
-                    size: 22,
-                  ),
-                ),
-              ),
+            _buildModernChip(
+              'Running',
+              state.selectedStatus == 'running',
+                  () => ref.read(orderHistoryProvider.notifier).filterByStatus('running'),
+              AppColors.info,
+              Icons.pending_actions_rounded,
+            ),
+            const SizedBox(width: 8),
+            _buildModernChip(
+              'Completed',
+              state.selectedStatus == 'completed',
+                  () => ref.read(orderHistoryProvider.notifier).filterByStatus('completed'),
+              AppColors.success,
+              Icons.check_circle_outline_rounded,
+            ),
+            const SizedBox(width: 8),
+            _buildModernChip(
+              'Cancelled',
+              state.selectedStatus == 'cancelled',
+                  () => ref.read(orderHistoryProvider.notifier).filterByStatus('cancelled'),
+              AppColors.error,
+              Icons.highlight_off_rounded,
             ),
           ],
-        ],
+        ),
       ),
     );
   }
 
-  void _showFilterBottomSheet(
+  void _showNewFilterBottomSheet(
       BuildContext context,
       OrderHistoryState state,
       WidgetRef ref,
@@ -475,29 +406,23 @@ class OrderHistoryScreen extends ConsumerWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.75,
-        minChildSize: 0.5,
-        maxChildSize: 0.9,
-        builder: (_, scrollController) => Consumer(
+      builder: (context) {
+        return Consumer(
           builder: (context, ref, child) {
             final currentState = ref.watch(orderHistoryProvider);
-            const sortOptions = <String, String>{
-              'createdAt': 'Date',
-              'orderNumber': 'Order #',
-              'totalAmount': 'Amount',
-            };
 
             return Container(
+              height: MediaQuery.of(context).size.height * 0.75,
               decoration: const BoxDecoration(
                 color: AppColors.surface,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
               ),
               child: Column(
                 children: [
-                  // Handle Bar
+                  const SizedBox(height: 10),
+
+                  /// Handle
                   Container(
-                    margin: const EdgeInsets.only(top: 12),
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
@@ -506,622 +431,261 @@ class OrderHistoryScreen extends ConsumerWidget {
                     ),
                   ),
 
-                  // Header
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      border: Border(
-                        bottom: BorderSide(color: AppColors.border),
-                      ),
-                    ),
+                  const SizedBox(height: 16),
+
+                  /// Header
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Row(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(
-                            Icons.tune_rounded,
-                            color: AppColors.primary,
-                            size: 24,
-                          ),
+                        const Text(
+                          "Filter Orders",
+                          style: AppTextStyles.primary20Bold,
                         ),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Text(
-                            'Filters & Sorting',
-                            style: AppTextStyles.primary20Bold,
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => Navigator.pop(context),
-                          icon: Icon(
-                            Icons.close_rounded,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: () {
+                            // ref.read(orderHistoryProvider.notifier).resetFilters();
+                          },
+                          child: const Text("Reset"),
+                        )
                       ],
                     ),
                   ),
 
-                  // Filter Content
+                  const Divider(height: 24),
+
+                  /// Content
                   Expanded(
                     child: ListView(
-                      controller: scrollController,
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
                       children: [
-                        // Status Filter Section
-                        _buildFilterSection(
-                          'Order Status',
-                          Icons.receipt_long_rounded,
-                          Column(
-                            children: [
-                              SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: Row(
-                                  children: [
-                                    _buildModernChip(
-                                      'All',
-                                      currentState.selectedStatus == null,
-                                          () {
-                                        searchController.clear();
-                                        ref.read(orderHistoryProvider.notifier).clearFilters();
-                                      },
-                                      AppColors.primary,
-                                      Icons.apps_rounded,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    _buildModernChip(
-                                      'Running',
-                                      currentState.selectedStatus == 'running',
-                                          () => ref.read(orderHistoryProvider.notifier).filterByStatus('running'),
-                                      AppColors.info,
-                                      Icons.pending_actions_rounded,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    _buildModernChip(
-                                      'Completed',
-                                      currentState.selectedStatus == 'completed',
-                                          () => ref.read(orderHistoryProvider.notifier).filterByStatus('completed'),
-                                      AppColors.success,
-                                      Icons.check_circle_outline_rounded,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    _buildModernChip(
-                                      'Cancelled',
-                                      currentState.selectedStatus == 'cancelled',
-                                          () => ref.read(orderHistoryProvider.notifier).filterByStatus('cancelled'),
-                                      AppColors.error,
-                                      Icons.highlight_off_rounded,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
+                        _buildSortSection(currentState, ref),
                         const SizedBox(height: 24),
-
-                        // Sort Section
-                        _buildFilterSection(
-                          'Sort By',
-                          Icons.sort_rounded,
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Container(
-                                  height: 48,
-                                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.background,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: AppColors.border),
-                                  ),
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButton<String>(
-                                      value: sortOptions.containsKey(currentState.sortBy)
-                                          ? currentState.sortBy
-                                          : 'createdAt',
-                                      isExpanded: true,
-                                      icon: Icon(
-                                        Icons.unfold_more_rounded,
-                                        color: AppColors.primary,
-                                        size: 20,
-                                      ),
-                                      style: AppTextStyles.primary14SemiBold,
-                                      items: sortOptions.entries
-                                          .map(
-                                            (e) => DropdownMenuItem<String>(
-                                          value: e.key,
-                                          child: Text(e.value),
-                                        ),
-                                      )
-                                          .toList(),
-                                      onChanged: (value) {
-                                        if (value == null) return;
-                                        ref.read(orderHistoryProvider.notifier).setSorting(
-                                          sortBy: value,
-                                          sortOrder: currentState.sortOrder,
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  onTap: () {
-                                    final nextOrder = currentState.sortOrder.toLowerCase() == 'asc'
-                                        ? 'desc'
-                                        : 'asc';
-                                    ref.read(orderHistoryProvider.notifier).setSorting(
-                                      sortBy: currentState.sortBy,
-                                      sortOrder: nextOrder,
-                                    );
-                                  },
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Container(
-                                    height: 48,
-                                    width: 48,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: AppColors.primary.withValues(alpha: 0.3),
-                                      ),
-                                    ),
-                                    child: Icon(
-                                      currentState.sortOrder.toLowerCase() == 'asc'
-                                          ? Icons.arrow_upward_rounded
-                                          : Icons.arrow_downward_rounded,
-                                      color: AppColors.primary,
-                                      size: 22,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(height: 24),
-
-                        // Quick Date Filters
-                        _buildFilterSection(
-                          'Quick Date Filters',
-                          Icons.calendar_today_rounded,
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _buildDateFilterButton(
-                                  'Today',
-                                  Icons.today_rounded,
-                                      () {
-                                    ref.read(orderHistoryProvider.notifier).loadTodayOrders();
-                                    Navigator.pop(context);
-                                  },
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: _buildDateFilterButton(
-                                  'Week',
-                                  Icons.date_range_rounded,
-                                      () {
-                                    ref.read(orderHistoryProvider.notifier).loadThisWeekOrders();
-                                    Navigator.pop(context);
-                                  },
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: _buildDateFilterButton(
-                                  'Month',
-                                  Icons.calendar_month_rounded,
-                                      () {
-                                    ref.read(orderHistoryProvider.notifier).loadThisMonthOrders();
-                                    Navigator.pop(context);
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(height: 32),
-
-                        // Apply Button
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: () => Navigator.pop(context),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              foregroundColor: AppColors.textOnPrimary,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              elevation: 0,
-                            ),
-                            child: const Text(
-                              'Apply Filters',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
+                        _buildDateRangeSection(context, currentState, ref),
+                        const SizedBox(height: 100),
                       ],
+                    ),
+                  ),
+
+                  /// Bottom Action
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: const BoxDecoration(
+                      color: AppColors.surface,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black12,
+                          blurRadius: 10,
+                          offset: Offset(0, -2),
+                        )
+                      ],
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: const Text(
+                          "Apply Filters",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ],
               ),
             );
           },
+        );
+      },
+    );
+  }
+  Widget _buildSortSection(OrderHistoryState state, WidgetRef ref) {
+    const options = [
+      {'value': 'createdAt', 'label': 'Date'},
+      {'value': 'orderNumber', 'label': 'Order'},
+      {'value': 'totalAmount', 'label': 'Amount'},
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Sort By",
+          style: AppTextStyles.primary14SemiBold,
         ),
-      ),
+
+        /// Sort field radio list
+        ...options.map((opt) {
+          return RadioListTile<String>(
+            value: opt['value']!,
+            groupValue: state.sortBy,
+            onChanged: (value) {
+              if (value != null) {
+                ref.read(orderHistoryProvider.notifier).setSorting(
+                  sortBy: value,
+                  sortOrder: state.sortOrder,
+                );
+              }
+            },
+            activeColor: AppColors.primary,
+            contentPadding: EdgeInsets.zero,
+
+            /// ↓ Compact settings
+            dense: true,
+            visualDensity: const VisualDensity(vertical: -4),
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+
+            title: Text(
+              opt['label']!,
+              style: AppTextStyles.primary14SemiBold,
+            ),
+          );
+        }).toList(),
+
+        const SizedBox(height: 8),
+
+        const Text(
+          "Sort Order",
+          style: AppTextStyles.primary14SemiBold,
+        ),
+
+        RadioListTile<String>(
+          value: "asc",
+          groupValue: state.sortOrder,
+          onChanged: (value) {
+            if (value != null) {
+              ref.read(orderHistoryProvider.notifier).setSorting(
+                sortBy: state.sortBy,
+                sortOrder: value,
+              );
+            }
+          },
+          activeColor: AppColors.primary,
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          visualDensity: const VisualDensity(vertical: -4),
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          title: const Text("Low → High"),
+        ),
+
+        RadioListTile<String>(
+          value: "desc",
+          groupValue: state.sortOrder,
+          onChanged: (value) {
+            if (value != null) {
+              ref.read(orderHistoryProvider.notifier).setSorting(
+                sortBy: state.sortBy,
+                sortOrder: value,
+              );
+            }
+          },
+          activeColor: AppColors.primary,
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          visualDensity: const VisualDensity(vertical: -4),
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          title: const Text("High → Low"),
+        ),
+      ],
     );
   }
-
-  Widget _buildFilterSection(String title, IconData icon, Widget content) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 20, color: AppColors.primary),
-              const SizedBox(width: 10),
-              Text(
-                title,
-                style: AppTextStyles.primary14SemiBold,
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          content,
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCombinedFilterSection(
+  Widget _buildDateRangeSection(
+      BuildContext context,
       OrderHistoryState state,
       WidgetRef ref,
-      TextEditingController searchController,
       ) {
-    const sortOptions = <String, String>{
-      'createdAt': 'Date',
-      'orderNumber': 'Order #',
-      'totalAmount': 'Amount',
-    };
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.primary.withValues(alpha: 0.03),
-            AppColors.surface,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text("Custom Date", style: AppTextStyles.primary14SemiBold),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildDateBox(
+                label: "Start",
+                date: state.fromDate,
+                onTap: () => _selectStartDate(context, state, ref),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildDateBox(
+                label: "End",
+                date: state.toDate,
+                onTap: () => _selectEndDate(context, state, ref),
+              ),
+            ),
           ],
         ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // Header Section
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.05),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.tune_rounded,
-                    color: AppColors.textOnPrimary,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text(
-                    'Filters & Sorting',
-                    style: AppTextStyles.primary16Bold,
-                  ),
-                ),
-                if (state.selectedStatus != null ||
-                    state.fromDate != null ||
-                    state.toDate != null)
-                  TextButton.icon(
-                    onPressed: () {
-                      searchController.clear();
-                      ref.read(orderHistoryProvider.notifier).clearFilters();
-                    },
-                    icon: const Icon(Icons.clear_all_rounded, size: 16),
-                    label: const Text('Clear All'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.error,
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      minimumSize: const Size(0, 0),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                  ),
-              ],
-            ),
-          ),
+      ],
+    );
+  }
 
-          // Status Filter Section
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 3,
-                      height: 16,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Order Status',
-                      style: AppTextStyles.primary14SemiBold,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _buildModernChip(
-                        'All',
-                        state.selectedStatus == null,
-                            () {
-                          searchController.clear();
-                          ref.read(orderHistoryProvider.notifier).clearFilters();
-                        },
-                        AppColors.primary,
-                        Icons.apps_rounded,
-                      ),
-                      const SizedBox(width: 8),
-                      _buildModernChip(
-                        'Running',
-                        state.selectedStatus == 'running',
-                            () => ref.read(orderHistoryProvider.notifier).filterByStatus('running'),
-                        AppColors.info,
-                        Icons.pending_actions_rounded,
-                      ),
-                      const SizedBox(width: 8),
-                      _buildModernChip(
-                        'Completed',
-                        state.selectedStatus == 'completed',
-                            () => ref.read(orderHistoryProvider.notifier).filterByStatus('completed'),
-                        AppColors.success,
-                        Icons.check_circle_outline_rounded,
-                      ),
-                      const SizedBox(width: 8),
-                      _buildModernChip(
-                        'Cancelled',
-                        state.selectedStatus == 'cancelled',
-                            () => ref.read(orderHistoryProvider.notifier).filterByStatus('cancelled'),
-                        AppColors.error,
-                        Icons.highlight_off_rounded,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+  Widget _buildDateBox({
+    required String label,
+    required DateTime? date,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: AppTextStyles.textSecondary12Medium),
+            const SizedBox(height: 4),
+            Text(
+              date != null
+                  ? "${date.day}/${date.month}/${date.year}"
+                  : "Select",
+              style: AppTextStyles.primary14SemiBold,
             ),
-          ),
-
-          // Divider
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Divider(height: 1, color: AppColors.border.withValues(alpha: 0.5)),
-          ),
-
-          // Sort & Date Row
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                // Sort Section
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 3,
-                            height: 16,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Sort By',
-                            style: AppTextStyles.primary14SemiBold,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Container(
-                              height: 44,
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              decoration: BoxDecoration(
-                                color: AppColors.background,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: AppColors.border),
-                              ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<String>(
-                                  value: sortOptions.containsKey(state.sortBy) ? state.sortBy : 'createdAt',
-                                  isExpanded: true,
-                                  icon: Icon(
-                                    Icons.unfold_more_rounded,
-                                    color: AppColors.primary,
-                                    size: 20,
-                                  ),
-                                  style: AppTextStyles.primary14SemiBold,
-                                  items: sortOptions.entries
-                                      .map(
-                                        (e) => DropdownMenuItem<String>(
-                                      value: e.key,
-                                      child: Text(e.value),
-                                    ),
-                                  )
-                                      .toList(),
-                                  onChanged: (value) {
-                                    if (value == null) return;
-                                    ref.read(orderHistoryProvider.notifier).setSorting(
-                                      sortBy: value,
-                                      sortOrder: state.sortOrder,
-                                    );
-                                  },
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: () {
-                                final nextOrder = state.sortOrder.toLowerCase() == 'asc' ? 'desc' : 'asc';
-                                ref.read(orderHistoryProvider.notifier).setSorting(
-                                  sortBy: state.sortBy,
-                                  sortOrder: nextOrder,
-                                );
-                              },
-                              borderRadius: BorderRadius.circular(10),
-                              child: Container(
-                                height: 44,
-                                width: 44,
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: AppColors.primary.withValues(alpha: 0.3),
-                                  ),
-                                ),
-                                child: Icon(
-                                  state.sortOrder.toLowerCase() == 'asc'
-                                      ? Icons.arrow_upward_rounded
-                                      : Icons.arrow_downward_rounded,
-                                  color: AppColors.primary,
-                                  size: 20,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Quick Date Filters
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 3,
-                      height: 16,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Quick Filters',
-                      style: AppTextStyles.primary14SemiBold,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildDateFilterButton(
-                        'Today',
-                        Icons.today_rounded,
-                            () => ref.read(orderHistoryProvider.notifier).loadTodayOrders(),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildDateFilterButton(
-                        'Week',
-                        Icons.date_range_rounded,
-                            () => ref.read(orderHistoryProvider.notifier).loadThisWeekOrders(),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildDateFilterButton(
-                        'Month',
-                        Icons.calendar_month_rounded,
-                            () => ref.read(orderHistoryProvider.notifier).loadThisMonthOrders(),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
+  }
+
+  Future<void> _selectStartDate(BuildContext context, OrderHistoryState state, WidgetRef ref) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: state.fromDate ?? DateTime.now(),
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now(),
+    );
+
+    if (picked != null) {
+      ref.read(orderHistoryProvider.notifier).filterByDateRange(picked, state.toDate);
+    }
+  }
+
+  Future<void> _selectEndDate(BuildContext context, OrderHistoryState state, WidgetRef ref) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: state.toDate ?? DateTime.now(),
+      firstDate: state.fromDate ?? DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now(),
+    );
+
+    if (picked != null) {
+      ref.read(orderHistoryProvider.notifier).filterByDateRange(state.fromDate, picked);
+    }
   }
 
   Widget _buildModernChip(
