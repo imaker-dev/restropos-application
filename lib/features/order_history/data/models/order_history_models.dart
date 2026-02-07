@@ -1,5 +1,83 @@
 /// API Models for Order History Module
 
+DateTime _parseApiDate(dynamic value) {
+  if (value == null) return DateTime.fromMillisecondsSinceEpoch(0);
+  final raw = value.toString();
+  if (raw.isEmpty) return DateTime.fromMillisecondsSinceEpoch(0);
+  try {
+    return DateTime.parse(raw);
+  } catch (_) {
+    try {
+      return DateTime.parse(raw.replaceFirst(' ', 'T'));
+    } catch (_) {
+      return DateTime.fromMillisecondsSinceEpoch(0);
+    }
+  }
+}
+
+double _parseApiDouble(dynamic value) {
+  if (value == null) return 0.0;
+  if (value is num) return value.toDouble();
+  return double.tryParse(value.toString()) ?? 0.0;
+}
+
+int _parseApiInt(dynamic value) {
+  if (value == null) return 0;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse(value.toString()) ?? 0;
+}
+
+class OrderHistoryPagination {
+  final int page;
+  final int limit;
+  final int total;
+  final int totalPages;
+
+  const OrderHistoryPagination({
+    required this.page,
+    required this.limit,
+    required this.total,
+    required this.totalPages,
+  });
+
+  factory OrderHistoryPagination.fromJson(Map<String, dynamic> json) {
+    return OrderHistoryPagination(
+      page: _parseApiInt(json['page']),
+      limit: _parseApiInt(json['limit']),
+      total: _parseApiInt(json['total']),
+      totalPages: _parseApiInt(json['totalPages']),
+    );
+  }
+}
+
+class OrderHistoryPage {
+  final List<OrderHistory> orders;
+  final OrderHistoryPagination pagination;
+
+  const OrderHistoryPage({
+    required this.orders,
+    required this.pagination,
+  });
+
+  factory OrderHistoryPage.fromJson(Map<String, dynamic> json) {
+    final rawOrders = json['orders'] as List?;
+    final orders =
+        rawOrders
+            ?.map((e) => OrderHistory.fromJson(e as Map<String, dynamic>))
+            .toList() ??
+        <OrderHistory>[];
+
+    final paginationJson = json['pagination'] as Map<String, dynamic>? ?? const {};
+    final pagination = OrderHistoryPagination.fromJson(paginationJson);
+
+    return OrderHistoryPage(
+      orders: orders,
+      pagination: pagination,
+    );
+  }
+}
+
 class OrderHistory {
   final int id;
   final String? uuid;
@@ -24,6 +102,7 @@ class OrderHistory {
   final double? paidAmount;
   final double? balanceAmount;
   final String? notes;
+  final int? itemCount;
   final List<OrderHistoryItem> items;
   final String? duration;
   final DateTime createdAt;
@@ -55,6 +134,7 @@ class OrderHistory {
     this.paidAmount,
     this.balanceAmount,
     this.notes,
+    this.itemCount,
     required this.items,
     this.duration,
     required this.createdAt,
@@ -73,47 +153,56 @@ class OrderHistory {
       }
     }
 
-    // Parse dates
-    DateTime? completedAt;
-    if (json['completedAt'] != null) {
-      completedAt = DateTime.parse(json['completedAt'].toString());
-    }
+    // Parse dates (supports both camelCase and snake_case)
+    final completedAtRaw = json['completedAt'] ?? json['completed_at'];
+    final cancelledAtRaw = json['cancelledAt'] ?? json['cancelled_at'];
+    final updatedAtRaw = json['updatedAt'] ?? json['updated_at'];
+    final createdAtRaw = json['createdAt'] ?? json['created_at'];
 
-    DateTime? cancelledAt;
-    if (json['cancelledAt'] != null) {
-      cancelledAt = DateTime.parse(json['cancelledAt'].toString());
-    }
+    final DateTime? completedAt =
+        completedAtRaw == null ? null : _parseApiDate(completedAtRaw);
+    final DateTime? cancelledAt =
+        cancelledAtRaw == null ? null : _parseApiDate(cancelledAtRaw);
+    final DateTime? updatedAt =
+        updatedAtRaw == null ? null : _parseApiDate(updatedAtRaw);
 
     return OrderHistory(
-      id: json['id'] as int? ?? 0,
+      id: _parseApiInt(json['id']),
       uuid: json['uuid'] as String?,
-      orderNumber: json['orderNumber'] as String?,
-      tableId: json['tableId'] as int? ?? 0,
-      tableNumber: json['tableNumber'] as String?,
-      tableName: json['tableName'] as String?,
-      outletId: json['outletId'] as int? ?? 0,
-      orderType: json['orderType'] as String? ?? '',
+      orderNumber: (json['orderNumber'] ?? json['order_number']) as String?,
+      tableId: _parseApiInt(json['tableId'] ?? json['table_id']),
+      tableNumber: (json['tableNumber'] ?? json['table_number']) as String?,
+      tableName: (json['tableName'] ?? json['table_name']) as String?,
+      outletId: _parseApiInt(json['outletId'] ?? json['outlet_id']),
+      orderType: (json['orderType'] ?? json['order_type']) as String? ?? '',
       status: json['status'] as String? ?? '',
-      covers: json['covers'] as int? ?? 0,
-      customerName: json['customerName'] as String?,
-      customerPhone: json['customerPhone'] as String?,
-      captainId: json['captainId'] as int?,
-      captainName: json['captainName'] as String?,
-      createdBy: json['createdBy'] as String?,
-      subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0.0,
-      taxAmount: (json['taxAmount'] as num?)?.toDouble() ?? 0.0,
-      discountAmount: (json['discountAmount'] as num?)?.toDouble() ?? 0.0,
-      serviceCharge: (json['serviceCharge'] as num?)?.toDouble() ?? 0.0,
-      total: (json['total'] as num?)?.toDouble() ?? 0.0,
-      paidAmount: (json['paidAmount'] as num?)?.toDouble(),
-      balanceAmount: (json['balanceAmount'] as num?)?.toDouble(),
-      notes: json['notes'] as String?,
+      covers: _parseApiInt(json['covers'] ?? json['guest_count']),
+      customerName: (json['customerName'] ?? json['customer_name']) as String?,
+      customerPhone: (json['customerPhone'] ?? json['customer_phone']) as String?,
+      captainId: (json['captainId'] ?? json['created_by']) as int?,
+      captainName:
+          (json['captainName'] ?? json['created_by_name']) as String?,
+      createdBy: (json['createdBy'] ?? json['created_by_name']) as String?,
+      subtotal: _parseApiDouble(json['subtotal'] ?? json['subtotal_amount'] ?? json['subtotal']),
+      taxAmount: _parseApiDouble(json['taxAmount'] ?? json['tax_amount']),
+      discountAmount:
+          _parseApiDouble(json['discountAmount'] ?? json['discount_amount']),
+      serviceCharge: _parseApiDouble(json['serviceCharge'] ?? json['service_charge']),
+      total: _parseApiDouble(json['total'] ?? json['total_amount']),
+      paidAmount: json['paidAmount'] != null
+          ? _parseApiDouble(json['paidAmount'])
+          : (json['paid_amount'] != null ? _parseApiDouble(json['paid_amount']) : null),
+      balanceAmount: json['balanceAmount'] != null
+          ? _parseApiDouble(json['balanceAmount'])
+          : (json['due_amount'] != null ? _parseApiDouble(json['due_amount']) : null),
+      notes: (json['notes'] ?? json['internal_notes']) as String?,
+      itemCount: json['itemCount'] != null
+          ? _parseApiInt(json['itemCount'])
+          : (json['item_count'] != null ? _parseApiInt(json['item_count']) : null),
       items: items,
       duration: json['duration'] as String?,
-      createdAt: DateTime.parse(json['createdAt'].toString()),
-      updatedAt: json['updatedAt'] != null 
-          ? DateTime.parse(json['updatedAt'].toString()) 
-          : null,
+      createdAt: _parseApiDate(createdAtRaw),
+      updatedAt: updatedAt,
       completedAt: completedAt,
       cancelledAt: cancelledAt,
     );
@@ -144,6 +233,7 @@ class OrderHistory {
       'paidAmount': paidAmount,
       'balanceAmount': balanceAmount,
       'notes': notes,
+      'itemCount': itemCount,
       'items': items.map((item) => item.toJson()).toList(),
       'duration': duration,
       'createdAt': createdAt.toIso8601String(),
@@ -199,17 +289,27 @@ class OrderHistoryItem {
   });
 
   factory OrderHistoryItem.fromJson(Map<String, dynamic> json) {
+    final qtyRaw = json['quantity'];
+    final qty = qtyRaw is num
+        ? qtyRaw.toInt()
+        : (double.tryParse(qtyRaw?.toString() ?? '')?.round() ??
+            int.tryParse(qtyRaw?.toString() ?? '') ??
+            0);
+
+    final priceRaw = json['price'] ?? json['unit_price'];
+    final subtotalRaw = json['subtotal'] ?? json['total_price'];
+
     return OrderHistoryItem(
-      id: json['id'] as int? ?? 0,
-      orderId: json['orderId'] as int? ?? 0,
-      itemId: json['itemId'] as int? ?? 0,
-      itemName: json['itemName'] as String? ?? '',
-      itemShortCode: json['itemShortCode'] as String?,
-      price: (json['price'] as num?)?.toDouble() ?? 0.0,
-      quantity: json['quantity'] as int? ?? 0,
-      subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0.0,
-      variantName: json['variantName'] as String?,
-      notes: json['notes'] as String?,
+      id: _parseApiInt(json['id']),
+      orderId: _parseApiInt(json['orderId'] ?? json['order_id']),
+      itemId: _parseApiInt(json['itemId'] ?? json['item_id']),
+      itemName: (json['itemName'] ?? json['item_name']) as String? ?? '',
+      itemShortCode: (json['itemShortCode'] ?? json['short_name']) as String?,
+      price: _parseApiDouble(priceRaw),
+      quantity: qty,
+      subtotal: _parseApiDouble(subtotalRaw),
+      variantName: (json['variantName'] ?? json['variant_name']) as String?,
+      notes: (json['notes'] ?? json['special_instructions']) as String?,
       status: json['status'] as String? ?? '',
     );
   }

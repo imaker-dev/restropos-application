@@ -28,12 +28,16 @@ class AppColors {
   static const Color textSecondary = Color(0xFF757575);
   static const Color textHint = Color(0xFFBDBDBD);
   static const Color textOnPrimary = Color(0xFFFFFFFF);
+  static const Color white70 = Color(0xB3FFFFFF);
 
   // Status Colors
   static const Color success = Color(0xFF4CAF50);
   static const Color warning = Color(0xFFFF9800);
   static const Color error = Color(0xFFF44336);
   static const Color info = Color(0xFF2196F3);
+  static const Color refunded = Color(0xFFF59E0B);
+  static const Color completed = Color(0xFF10B981);  // For completed orders
+  static const Color cancelled = Color(0xFFEF4444);  // For cancelled orders
 
   // Table Status Colors
   static const Color tableAvailable = Color(0xFF4CAF50);  // Green - available for seating

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:restro/core/utils/extensions.dart';
 import '../../../../core/constants/constants.dart';
 import '../../../../core/utils/responsive_utils.dart';
 import '../../../../shared/widgets/widgets.dart';
@@ -140,10 +141,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.scaffoldBackground,
-      body: ResponsiveLayout(
-        mobile: _buildMobileLayout(authState),
-        tablet: _buildTabletLayout(authState),
-        desktop: _buildDesktopLayout(authState),
+      body: Stack(
+        children: [
+          ResponsiveLayout(
+            mobile: _buildMobileLayout(authState),
+            tablet: _buildTabletLayout(authState),
+            desktop: _buildDesktopLayout(authState),
+          ),
+          if (authState.isLoading) ...[
+            const SizedBox(height: AppSpacing.lg),
+            showProgressBar(),
+          ],
+        ],
       ),
     );
   }
@@ -373,10 +382,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           onSubmit: _submitPasscode,
           isLoading: authState.isLoading,
         ),
-        if (authState.isLoading) ...[
-          const SizedBox(height: AppSpacing.lg),
-          const LoadingIndicator(),
-        ],
+
       ],
     );
   }
@@ -492,10 +498,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           onSubmit: _submitPin,
           isLoading: authState.isLoading,
         ),
-        if (authState.isLoading) ...[
-          const SizedBox(height: AppSpacing.lg),
-          const LoadingIndicator(),
-        ],
       ],
     );
   }

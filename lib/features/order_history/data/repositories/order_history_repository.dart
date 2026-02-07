@@ -47,45 +47,82 @@ class OrderHistoryRepository {
   }
 
   /// Get order history with pagination
-  Future<ApiResult<List<OrderHistory>>> getOrderHistoryPaginated({
-    required int outletId,
+  Future<ApiResult<OrderHistoryPage>> getOrderHistoryPaginated({
+    int? outletId,
     int page = 1,
     int limit = 20,
     String? status,
-    String? fromDate,
-    String? toDate,
+    String? search,
+    String? startDate,
+    String? endDate,
+    String? sortBy,
+    String? sortOrder,
   }) async {
-    String url = ApiEndpoints.orderHistory(outletId);
     final queryParams = <String, String>{
       'page': page.toString(),
       'limit': limit.toString(),
     };
 
-    if (status != null) queryParams['status'] = status!;
-    if (fromDate != null) queryParams['from'] = fromDate!;
-    if (toDate != null) queryParams['to'] = toDate!;
+    if (status != null && status.toLowerCase() != 'all') {
+      queryParams['status'] = status;
+    }
+    if (search != null && search.trim().isNotEmpty) {
+      queryParams['search'] = search.trim();
+    }
+    if (startDate != null) queryParams['startDate'] = startDate;
+    if (endDate != null) queryParams['endDate'] = endDate;
+    if (sortBy != null) queryParams['sortBy'] = sortBy;
+    if (sortOrder != null) queryParams['sortOrder'] = sortOrder;
 
-    return _api.getList(
-      url,
-      parser: OrderHistory.fromJson,
+    final result = await _api.get(
+      ApiEndpoints.ordersList,
+      parser: (json) => OrderHistoryPage.fromJson(json as Map<String, dynamic>),
       queryParams: queryParams,
     );
+
+    if (result is ApiFailure<OrderHistoryPage> && result.statusCode == 404 && outletId != null) {
+      final legacyQueryParams = <String, String>{
+        'page': page.toString(),
+        'limit': limit.toString(),
+      };
+      if (status != null && status.toLowerCase() != 'all') {
+        legacyQueryParams['status'] = status;
+      }
+      if (search != null && search.trim().isNotEmpty) {
+        legacyQueryParams['search'] = search.trim();
+      }
+      if (startDate != null) legacyQueryParams['from'] = startDate;
+      if (endDate != null) legacyQueryParams['to'] = endDate;
+
+      return _api.get(
+        ApiEndpoints.orderHistory(outletId),
+        parser: (json) => OrderHistoryPage.fromJson(json as Map<String, dynamic>),
+        queryParams: legacyQueryParams,
+      );
+    }
+
+    return result;
   }
 
   /// Search order history
-  Future<ApiResult<List<OrderHistory>>> searchOrders({
-    required int outletId,
+  Future<ApiResult<OrderHistoryPage>> searchOrders({
+    int? outletId,
     required String query,
     int page = 1,
     int limit = 20,
   }) async {
-    return _api.getList(
-      '${ApiEndpoints.orderHistory(outletId)}?search=$query',
-      parser: OrderHistory.fromJson,
-      queryParams: {
-        'page': page.toString(),
-        'limit': limit.toString(),
-      },
+    return getOrderHistoryPaginated(
+      page: page,
+      limit: limit,
+      search: query,
+    );
+  }
+
+  /// Get captain order detail (history detail)
+  Future<ApiResult<OrderHistory>> getCaptainOrderDetail(int orderId) async {
+    return _api.get(
+      ApiEndpoints.captainOrderDetail(orderId),
+      parser: (json) => OrderHistory.fromJson(json as Map<String, dynamic>),
     );
   }
 
@@ -116,7 +153,7 @@ class OrderHistoryRepository {
     final weekEndString = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
     
     return _api.getList(
-      '${ApiEndpoints.orderHistoryByDate(outletId, weekStartString, weekEndString)}',
+      ApiEndpoints.orderHistoryByDate(outletId, weekStartString, weekEndString),
       parser: OrderHistory.fromJson,
     );
   }
@@ -128,7 +165,7 @@ class OrderHistoryRepository {
     final monthEndString = '${now.year}-${now.month.toString().padLeft(2, '0')}-31';
     
     return _api.getList(
-      '${ApiEndpoints.orderHistoryByDate(outletId, monthStartString, monthEndString)}',
+      ApiEndpoints.orderHistoryByDate(outletId, monthStartString, monthEndString),
       parser: OrderHistory.fromJson,
     );
   }

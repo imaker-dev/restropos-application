@@ -1,5 +1,9 @@
+import 'dart:io';
+
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:restro/core/constants/app_colors.dart';
 
 extension BuildContextExtensions on BuildContext {
   ThemeData get theme => Theme.of(this);
@@ -128,4 +132,17 @@ extension WidgetExtensions on Widget {
   Widget expanded({int flex = 1}) => Expanded(flex: flex, child: this);
   
   Widget flexible({int flex = 1}) => Flexible(flex: flex, child: this);
+}
+Widget showProgressBar() {
+  return Container(
+    alignment: Alignment.center,
+    child: (Platform.isIOS)
+        ? CupertinoActivityIndicator(
+      color: AppColors.primary,
+      radius: 20,
+    )
+        : CircularProgressIndicator(
+      color: AppColors.primary,
+    ),
+  );
 }

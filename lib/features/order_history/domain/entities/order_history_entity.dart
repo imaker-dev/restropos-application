@@ -26,6 +26,7 @@ class OrderHistoryEntity {
   final double? paidAmount;
   final double? balanceAmount;
   final String? notes;
+  final int? itemsCount;
   final List<OrderHistoryItemEntity> items;
   final String? duration;
   final DateTime createdAt;
@@ -57,6 +58,7 @@ class OrderHistoryEntity {
     this.paidAmount,
     this.balanceAmount,
     this.notes,
+    this.itemsCount,
     required this.items,
     this.duration,
     required this.createdAt,
@@ -91,6 +93,7 @@ class OrderHistoryEntity {
       paidAmount: model.paidAmount,
       balanceAmount: model.balanceAmount,
       notes: model.notes,
+      itemsCount: model.itemCount,
       items: model.items.map((item) => OrderHistoryItemEntity.fromModel(item)).toList(),
       duration: model.duration,
       createdAt: model.createdAt,
@@ -99,6 +102,8 @@ class OrderHistoryEntity {
       cancelledAt: model.cancelledAt,
     );
   }
+
+  int get itemsCountValue => itemsCount ?? items.length;
 
   /// Convert to API model
   OrderHistory toModel() {
@@ -126,6 +131,7 @@ class OrderHistoryEntity {
       paidAmount: paidAmount,
       balanceAmount: balanceAmount,
       notes: notes,
+      itemCount: itemsCount,
       items: items.map((item) => item.toModel()).toList(),
       duration: duration,
       createdAt: createdAt,
@@ -159,6 +165,8 @@ class OrderHistoryEntity {
   /// Get display status
   String get displayStatus {
     switch (status.toLowerCase()) {
+      case 'confirmed':
+        return 'Running';
       case 'completed':
         return 'Completed';
       case 'cancelled':

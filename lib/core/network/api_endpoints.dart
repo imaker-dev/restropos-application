@@ -2,7 +2,7 @@ class ApiEndpoints {
   ApiEndpoints._();
 
   static const String baseUrl =
-      "https://carmen-herb-shareware-commented.trycloudflare.com/api/v1";
+      "https://older-charging-dublin-signatures.trycloudflare.com/api/v1";
 
   // Default outlet ID
   static const int defaultOutletId = 4;
@@ -51,6 +51,8 @@ class ApiEndpoints {
   static String activeOrders(int outletId) => "/orders/active/$outletId";
   static String ordersByTable(int tableId) => "/orders/table/$tableId";
   static String orderById(int orderId) => "/orders/$orderId";
+  static String captainOrderDetail(int orderId) => "/orders/captain/detail/$orderId";
+  static const String ordersList = "/orders";
   static const String createOrder = "/orders";
   static String addOrderItems(int orderId) => "/orders/$orderId/items";
   static String updateItemQuantity(int orderItemId) =>
@@ -98,7 +100,7 @@ class ApiEndpoints {
       "/orders/reports/$outletId/dashboard";
 
   // ============ Order History ============
-  static String orderHistory(int outletId) => "/orders/history/$outletId";
+  static String orderHistory(int outletId) => "/orders/captain/history/$outletId";
   static String orderHistoryByDate(int outletId, String fromDate, String toDate) =>
       "/orders/history/$outletId?from=$fromDate&to=$toDate";
   static String orderHistorySummary(int outletId) => "/orders/history/$outletId/summary";
