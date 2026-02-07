@@ -1,8 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/constants.dart';
+import '../../../../core/network/websocket_service.dart';
 import '../../../../shared/widgets/widgets.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../layout/data/repositories/layout_repository.dart';
+import '../../../orders/presentation/widgets/kot_details_popup.dart';
 import '../../data/models/table_details_model.dart';
 
 /// Provider for fetching table details
@@ -179,11 +183,93 @@ class TableDetailsDialog extends ConsumerWidget {
 }
 
 /// Main content widget for table details
-class _TableDetailsContent extends ConsumerWidget {
+class _TableDetailsContent extends ConsumerStatefulWidget {
   final TableDetailsResponse details;
   final VoidCallback? onViewOrder;
 
   const _TableDetailsContent({required this.details, this.onViewOrder});
+
+  @override
+  ConsumerState<_TableDetailsContent> createState() =>
+      _TableDetailsContentState();
+}
+
+class _TableDetailsContentState extends ConsumerState<_TableDetailsContent> {
+  late TableDetailsResponse _details;
+  StreamSubscription<Map<String, dynamic>>? _kotSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _details = widget.details;
+    _listenToKotUpdates();
+  }
+
+  @override
+  void dispose() {
+    _kotSub?.cancel();
+    super.dispose();
+  }
+
+  void _listenToKotUpdates() {
+    final wsService = ref.read(webSocketServiceProvider);
+    _kotSub = wsService.kotUpdates.listen((data) {
+      final kotId =
+          data['kotId'] as int? ?? data['kot_id'] as int? ?? data['id'] as int?;
+      final newStatus = data['status'] as String?;
+      if (kotId == null || newStatus == null) return;
+
+      // Check if this KOT belongs to our table's order
+      final matchIndex = _details.kots.indexWhere((k) => k.id == kotId);
+      if (matchIndex >= 0) {
+        setState(() {
+          final updatedKots = List<TableKot>.from(_details.kots);
+          final old = updatedKots[matchIndex];
+          updatedKots[matchIndex] = TableKot(
+            id: old.id,
+            kotNumber: old.kotNumber,
+            status: newStatus,
+            station: old.station,
+            itemCount: old.itemCount,
+            priority: old.priority,
+            acceptedBy:
+                (data['acceptedBy'] as String?) ??
+                (data['accepted_by'] as String?) ??
+                old.acceptedBy,
+            acceptedAt: old.acceptedAt,
+            readyAt: old.readyAt,
+            servedAt: old.servedAt,
+            createdAt: old.createdAt,
+          );
+          _details = TableDetailsResponse(
+            id: _details.id,
+            tableNumber: _details.tableNumber,
+            name: _details.name,
+            status: _details.status,
+            capacity: _details.capacity,
+            minCapacity: _details.minCapacity,
+            shape: _details.shape,
+            isMergeable: _details.isMergeable,
+            isSplittable: _details.isSplittable,
+            qrCode: _details.qrCode,
+            location: _details.location,
+            position: _details.position,
+            session: _details.session,
+            captain: _details.captain,
+            order: _details.order,
+            items: _details.items,
+            kots: updatedKots,
+            billing: _details.billing,
+            timeline: _details.timeline,
+            mergedTables: _details.mergedTables,
+            statusSummary: _details.statusSummary,
+          );
+        });
+      }
+    });
+  }
+
+  TableDetailsResponse get details => _details;
 
   Color get _statusColor {
     switch (details.status) {
@@ -207,7 +293,7 @@ class _TableDetailsContent extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -498,64 +584,73 @@ class _TableDetailsContent extends ConsumerWidget {
       icon: Icons.receipt_long,
       children: [
         ...details.kots.map(
-          (kot) => Container(
-            margin: const EdgeInsets.symmetric(vertical: 4),
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: _getKotStatusColor(kot.status).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: _getKotStatusColor(kot.status).withValues(alpha: 0.3),
+          (kot) => GestureDetector(
+            onTap: () => showKotDetailsPopup(context, kot.id, ref: ref),
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 4),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: _getKotStatusColor(kot.status).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: _getKotStatusColor(kot.status).withValues(alpha: 0.3),
+                ),
               ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  _getKotStatusIcon(kot.status),
-                  size: 16,
-                  color: _getKotStatusColor(kot.status),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        kot.kotNumber,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Text(
-                        '${kot.station ?? 'Kitchen'} • ${kot.itemCount} items',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
+              child: Row(
+                children: [
+                  Icon(
+                    _getKotStatusIcon(kot.status),
+                    size: 16,
                     color: _getKotStatusColor(kot.status),
-                    borderRadius: BorderRadius.circular(4),
                   ),
-                  child: Text(
-                    kot.status.toUpperCase(),
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          kot.kotNumber,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          '${kot.station ?? 'Kitchen'} • ${kot.itemCount} items',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-              ],
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _getKotStatusColor(kot.status),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      kot.status.toUpperCase(),
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(
+                    Icons.chevron_right,
+                    size: 16,
+                    color: AppColors.textSecondary,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -708,9 +803,51 @@ class _TableDetailsContent extends ConsumerWidget {
         details.session != null &&
         !details.hasActiveOrder;
 
+    // Check if this table belongs to another captain
+    final currentUser = ref.read(currentUserProvider);
+    final currentUserId = currentUser?.id?.toString();
+    final isOwnedByAnotherCaptain =
+        details.captain != null &&
+        currentUserId != null &&
+        details.captain!.id.toString() != currentUserId;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Show warning if managed by another captain
+        if (isOwnedByAnotherCaptain) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: AppColors.warning.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: AppColors.warning.withValues(alpha: 0.4),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.lock_outline,
+                  color: AppColors.warning,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Managed by ${details.captain!.name}. Take transfer permission from manager to access this order.',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.warning,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         // Primary action based on status
         if (details.status == 'available' || details.status.isEmpty) ...[
           ElevatedButton.icon(
@@ -729,14 +866,14 @@ class _TableDetailsContent extends ConsumerWidget {
               ),
             ),
           ),
-        ] else if (isOccupiedWithoutOrder) ...[
+        ] else if (isOccupiedWithoutOrder && !isOwnedByAnotherCaptain) ...[
           // Occupied table with session but no order - show TAKE ORDER button
           ElevatedButton.icon(
             onPressed: () {
               // Store table details for order screen to use
               ref.read(currentTableDetailsProvider.notifier).state = details;
               Navigator.of(context).pop();
-              onViewOrder?.call();
+              widget.onViewOrder?.call();
             },
             icon: const Icon(Icons.restaurant_menu),
             label: const Text('TAKE ORDER'),
@@ -749,7 +886,7 @@ class _TableDetailsContent extends ConsumerWidget {
               ),
             ),
           ),
-        ] else if (details.hasActiveOrder) ...[
+        ] else if (details.hasActiveOrder && !isOwnedByAnotherCaptain) ...[
           Row(
             children: [
               Expanded(
@@ -759,7 +896,7 @@ class _TableDetailsContent extends ConsumerWidget {
                     ref.read(currentTableDetailsProvider.notifier).state =
                         details;
                     Navigator.of(context).pop();
-                    onViewOrder?.call();
+                    widget.onViewOrder?.call();
                   },
                   icon: const Icon(Icons.edit),
                   label: const Text('VIEW ORDER'),
@@ -797,6 +934,8 @@ class _TableDetailsContent extends ConsumerWidget {
               ),
             ],
           ),
+        ] else if (details.hasActiveOrder && isOwnedByAnotherCaptain) ...[
+          // Another captain's order - no action buttons, just the warning above
         ] else if (details.status == 'cleaning') ...[
           ElevatedButton.icon(
             onPressed: () {
@@ -831,7 +970,8 @@ class _TableDetailsContent extends ConsumerWidget {
               ),
             ),
           ),
-        ] else if (details.status == 'reserved') ...[
+        ] else if (details.status == 'reserved' &&
+            !isOwnedByAnotherCaptain) ...[
           ElevatedButton.icon(
             onPressed: () {
               Navigator.of(context).pop();
@@ -849,6 +989,7 @@ class _TableDetailsContent extends ConsumerWidget {
             ),
           ),
         ],
+        // If another captain owns a reserved table, show nothing extra
       ],
     );
   }

@@ -64,33 +64,56 @@ class ApiOrder {
   });
 
   factory ApiOrder.fromJson(Map<String, dynamic> json) {
+    // Handle both camelCase and snake_case field names from API
     return ApiOrder(
       id: json['id'] as int? ?? 0,
       uuid: json['uuid'] as String?,
-      orderNumber: json['orderNumber'] as String?,
-      tableId: json['tableId'] as int? ?? 0,
-      tableNumber: json['tableNumber'] as String?,
-      tableName: json['tableName'] as String?,
-      outletId: json['outletId'] as int? ?? 0,
-      orderType: json['orderType'] as String? ?? 'dine_in',
+      orderNumber:
+          json['orderNumber'] as String? ?? json['order_number'] as String?,
+      tableId: json['tableId'] as int? ?? json['table_id'] as int? ?? 0,
+      tableNumber:
+          json['tableNumber'] as String? ?? json['table_number'] as String?,
+      tableName: json['tableName'] as String? ?? json['table_name'] as String?,
+      outletId: json['outletId'] as int? ?? json['outlet_id'] as int? ?? 0,
+      orderType:
+          json['orderType'] as String? ??
+          json['order_type'] as String? ??
+          'dine_in',
       status: json['status'] as String? ?? 'pending',
-      covers: json['covers'] as int? ?? json['guestCount'] as int? ?? 1,
-      customerName: json['customerName'] as String?,
-      customerPhone: json['customerPhone'] as String?,
-      captainId: json['captainId'] as int?,
-      captainName: json['captainName'] as String?,
-      createdBy: json['createdBy'] as String?,
-      subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0,
-      taxAmount: (json['taxAmount'] as num?)?.toDouble() ?? 0,
-      discountAmount: (json['discountAmount'] as num?)?.toDouble() ?? 0,
-      serviceCharge: (json['serviceCharge'] as num?)?.toDouble() ?? 0,
-      total:
-          (json['total'] as num?)?.toDouble() ??
-          (json['grandTotal'] as num?)?.toDouble() ??
-          0,
-      paidAmount: (json['paidAmount'] as num?)?.toDouble(),
-      balanceAmount: (json['balanceAmount'] as num?)?.toDouble(),
-      notes: json['notes'] as String?,
+      covers:
+          json['covers'] as int? ??
+          json['guestCount'] as int? ??
+          json['guest_count'] as int? ??
+          1,
+      customerName:
+          json['customerName'] as String? ?? json['customer_name'] as String?,
+      customerPhone:
+          json['customerPhone'] as String? ?? json['customer_phone'] as String?,
+      captainId: json['captainId'] as int? ?? json['captain_id'] as int?,
+      captainName:
+          json['captainName'] as String? ?? json['created_by_name'] as String?,
+      createdBy:
+          json['createdBy'] as String? ??
+          (json['created_by'] != null ? json['created_by'].toString() : null),
+      subtotal: _parseDouble(json['subtotal']),
+      taxAmount: _parseDouble(json['taxAmount'] ?? json['tax_amount']),
+      discountAmount: _parseDouble(
+        json['discountAmount'] ?? json['discount_amount'],
+      ),
+      serviceCharge: _parseDouble(
+        json['serviceCharge'] ?? json['service_charge'],
+      ),
+      total: _parseDouble(
+        json['total'] ?? json['grandTotal'] ?? json['total_amount'],
+      ),
+      paidAmount: json['paidAmount'] != null || json['paid_amount'] != null
+          ? _parseDouble(json['paidAmount'] ?? json['paid_amount'])
+          : null,
+      balanceAmount: json['balanceAmount'] != null || json['due_amount'] != null
+          ? _parseDouble(json['balanceAmount'] ?? json['due_amount'])
+          : null,
+      notes:
+          json['notes'] as String? ?? json['special_instructions'] as String?,
       items:
           (json['items'] as List?)
               ?.map((e) => ApiOrderItem.fromJson(e as Map<String, dynamic>))
@@ -104,12 +127,24 @@ class ApiOrder {
           .toList(),
       duration: json['duration'] as String?,
       createdAt:
-          DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+          DateTime.tryParse(
+            json['createdAt'] as String? ?? json['created_at'] as String? ?? '',
+          ) ??
           DateTime.now(),
       updatedAt: json['updatedAt'] != null
           ? DateTime.tryParse(json['updatedAt'] as String)
+          : json['updated_at'] != null
+          ? DateTime.tryParse(json['updated_at'] as String)
           : null,
     );
+  }
+
+  /// Helper to parse double from String or num
+  static double _parseDouble(dynamic value) {
+    if (value == null) return 0;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0;
+    return 0;
   }
 
   Map<String, dynamic> toJson() => {
@@ -343,33 +378,36 @@ class OrderItemAddon {
 class CreateOrderRequest {
   final int tableId;
   final int outletId;
-  final int covers;
+  final int? floorId;
+  final int? sectionId;
+  final int guestCount;
   final String orderType;
-  final List<CreateOrderItemRequest> items;
   final String? customerName;
   final String? customerPhone;
-  final String? notes;
+  final String? specialInstructions;
 
   const CreateOrderRequest({
     required this.tableId,
     required this.outletId,
-    required this.covers,
+    this.floorId,
+    this.sectionId,
+    required this.guestCount,
     this.orderType = 'dine_in',
-    required this.items,
     this.customerName,
     this.customerPhone,
-    this.notes,
+    this.specialInstructions,
   });
 
   Map<String, dynamic> toJson() => {
     'tableId': tableId,
     'outletId': outletId,
-    'covers': covers,
+    if (floorId != null) 'floorId': floorId,
+    if (sectionId != null) 'sectionId': sectionId,
+    'guestCount': guestCount,
     'orderType': orderType,
-    'items': items.map((e) => e.toJson()).toList(),
     if (customerName != null) 'customerName': customerName,
     if (customerPhone != null) 'customerPhone': customerPhone,
-    if (notes != null) 'notes': notes,
+    if (specialInstructions != null) 'specialInstructions': specialInstructions,
   };
 }
 
@@ -394,7 +432,7 @@ class CreateOrderItemRequest {
     'itemId': itemId,
     'quantity': quantity,
     if (variantId != null) 'variantId': variantId,
-    if (addonIds != null && addonIds!.isNotEmpty) 'addonIds': addonIds,
+    if (addonIds != null && addonIds!.isNotEmpty) 'addons': addonIds,
     if (specialInstructions != null) 'specialInstructions': specialInstructions,
     if (notes != null) 'notes': notes,
   };
@@ -517,14 +555,24 @@ class ApiKot {
   final int? captainId;
   final String? captainName;
   final String? notes;
+  final int priority;
   final int? printerId;
   final bool printed;
+  final int printedCount;
+  final DateTime? lastPrintedAt;
   final String? waitTime;
   final DateTime? sentAt;
+  final String? acceptedBy;
   final DateTime? acceptedAt;
   final DateTime? readyAt;
   final DateTime? servedAt;
+  final String? servedBy;
+  final String? cancelledBy;
+  final DateTime? cancelledAt;
+  final String? cancelReason;
+  final int? createdBy;
   final DateTime createdAt;
+  final DateTime? updatedAt;
 
   const ApiKot({
     required this.id,
@@ -542,88 +590,171 @@ class ApiKot {
     this.captainId,
     this.captainName,
     this.notes,
+    this.priority = 0,
     this.printerId,
     this.printed = false,
+    this.printedCount = 0,
+    this.lastPrintedAt,
     this.waitTime,
     this.sentAt,
+    this.acceptedBy,
     this.acceptedAt,
     this.readyAt,
     this.servedAt,
+    this.servedBy,
+    this.cancelledBy,
+    this.cancelledAt,
+    this.cancelReason,
+    this.createdBy,
     required this.createdAt,
+    this.updatedAt,
   });
 
   factory ApiKot.fromJson(Map<String, dynamic> json) {
+    // Parse items list
+    final itemsList =
+        (json['items'] as List?)
+            ?.map((e) => KotItem.fromJson(e as Map<String, dynamic>))
+            .toList() ??
+        [];
+
     return ApiKot(
       id: json['id'] as int? ?? 0,
-      kotNumber: json['kotNumber'] as String? ?? '',
-      orderId: json['orderId'] as int? ?? 0,
-      orderNumber: json['orderNumber'] as String?,
-      tableId: json['tableId'] as int? ?? 0,
-      tableNumber: json['tableNumber'] as String?,
-      tableName: json['tableName'] as String?,
+      kotNumber:
+          json['kotNumber'] as String? ?? json['kot_number'] as String? ?? '',
+      orderId: json['orderId'] as int? ?? json['order_id'] as int? ?? 0,
+      orderNumber:
+          json['orderNumber'] as String? ?? json['order_number'] as String?,
+      tableId: json['tableId'] as int? ?? json['table_id'] as int? ?? 0,
+      tableNumber:
+          json['tableNumber'] as String? ?? json['table_number'] as String?,
+      tableName: json['tableName'] as String? ?? json['table_name'] as String?,
       status: json['status'] as String? ?? 'pending',
       station: json['station'] as String?,
-      stationType: json['stationType'] as String?,
-      items:
-          (json['items'] as List?)
-              ?.map((e) => KotItem.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          [],
-      itemCount: json['itemCount'] as int? ?? 0,
-      captainId: json['captainId'] as int?,
-      captainName: json['captainName'] as String?,
+      stationType:
+          json['stationType'] as String? ?? json['station_type'] as String?,
+      items: itemsList,
+      itemCount:
+          json['itemCount'] as int? ??
+          json['item_count'] as int? ??
+          itemsList.length,
+      captainId: json['captainId'] as int? ?? json['captain_id'] as int?,
+      captainName:
+          json['captainName'] as String? ?? json['captain_name'] as String?,
       notes: json['notes'] as String?,
-      printerId: json['printerId'] as int?,
+      priority: json['priority'] as int? ?? 0,
+      printerId: json['printerId'] as int? ?? json['printer_id'] as int?,
       printed: json['printed'] as bool? ?? false,
+      printedCount:
+          json['printedCount'] as int? ?? json['printed_count'] as int? ?? 0,
+      lastPrintedAt: _tryParseDateTime(
+        json['lastPrintedAt'] ?? json['last_printed_at'],
+      ),
       waitTime: json['waitTime'] as String?,
-      sentAt: json['sentAt'] != null
-          ? DateTime.tryParse(json['sentAt'] as String)
-          : null,
-      acceptedAt: json['acceptedAt'] != null
-          ? DateTime.tryParse(json['acceptedAt'] as String)
-          : null,
-      readyAt: json['readyAt'] != null
-          ? DateTime.tryParse(json['readyAt'] as String)
-          : null,
-      servedAt: json['servedAt'] != null
-          ? DateTime.tryParse(json['servedAt'] as String)
-          : null,
+      sentAt: _tryParseDateTime(json['sentAt'] ?? json['sent_at']),
+      acceptedBy:
+          json['acceptedBy']?.toString() ?? json['accepted_by']?.toString(),
+      acceptedAt: _tryParseDateTime(json['acceptedAt'] ?? json['accepted_at']),
+      readyAt: _tryParseDateTime(json['readyAt'] ?? json['ready_at']),
+      servedAt: _tryParseDateTime(json['servedAt'] ?? json['served_at']),
+      servedBy: json['servedBy']?.toString() ?? json['served_by']?.toString(),
+      cancelledBy:
+          json['cancelledBy']?.toString() ?? json['cancelled_by']?.toString(),
+      cancelledAt: _tryParseDateTime(
+        json['cancelledAt'] ?? json['cancelled_at'],
+      ),
+      cancelReason:
+          json['cancelReason'] as String? ?? json['cancel_reason'] as String?,
+      createdBy: json['createdBy'] as int? ?? json['created_by'] as int?,
       createdAt:
-          DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+          _tryParseDateTime(json['createdAt'] ?? json['created_at']) ??
           DateTime.now(),
+      updatedAt: _tryParseDateTime(json['updatedAt'] ?? json['updated_at']),
     );
+  }
+
+  static DateTime? _tryParseDateTime(dynamic value) {
+    if (value == null) return null;
+    if (value is String) return DateTime.tryParse(value);
+    return null;
   }
 
   bool get isPending => status == 'pending';
   bool get isPrinted => status == 'printed';
   bool get isPreparing => status == 'preparing';
+  bool get isAccepted => status == 'accepted';
   bool get isReady => status == 'ready';
   bool get isServed => status == 'served';
+  bool get isCancelled => status == 'cancelled';
   bool get isInProgress => status == 'in_progress' || status == 'preparing';
   bool get isCompleted => status == 'completed' || status == 'served';
 }
 
 class KotItem {
+  final int? id;
+  final int? kotId;
+  final int? orderItemId;
   final String name;
   final int quantity;
+  final String? variant;
+  final String? addonsText;
   final String? instructions;
   final String? status;
+  final DateTime? createdAt;
 
   const KotItem({
+    this.id,
+    this.kotId,
+    this.orderItemId,
     required this.name,
     required this.quantity,
+    this.variant,
+    this.addonsText,
     this.instructions,
     this.status,
+    this.createdAt,
   });
 
   factory KotItem.fromJson(Map<String, dynamic> json) {
     return KotItem(
-      name: json['name'] as String? ?? '',
-      quantity: json['quantity'] as int? ?? 1,
-      instructions: json['instructions'] as String?,
+      id: json['id'] as int?,
+      kotId: json['kotId'] as int? ?? json['kot_id'] as int?,
+      orderItemId: json['orderItemId'] as int? ?? json['order_item_id'] as int?,
+      name:
+          json['name'] as String? ??
+          json['item_name'] as String? ??
+          json['itemName'] as String? ??
+          '',
+      quantity: _parseQuantity(json['quantity']),
+      variant:
+          json['variant'] as String? ??
+          json['variant_name'] as String? ??
+          json['variantName'] as String?,
+      addonsText:
+          json['addonsText'] as String? ?? json['addons_text'] as String?,
+      instructions:
+          json['instructions'] as String? ??
+          json['special_instructions'] as String? ??
+          json['specialInstructions'] as String?,
       status: json['status'] as String?,
+      createdAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'] as String)
+          : json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'] as String)
+          : null,
     );
   }
+
+  static int _parseQuantity(dynamic value) {
+    if (value == null) return 1;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return double.tryParse(value)?.toInt() ?? 1;
+    return 1;
+  }
+
+  bool get hasAddons => addonsText != null && addonsText!.isNotEmpty;
+  bool get hasInstructions => instructions != null && instructions!.isNotEmpty;
 }
 
 class SendKotRequest {

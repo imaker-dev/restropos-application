@@ -35,9 +35,15 @@ class MenuRepository {
   }
 
   /// Get captain menu (categories + items optimized for captain view)
-  Future<ApiResult<CaptainMenu>> getCaptainMenu(int outletId) async {
+  Future<ApiResult<CaptainMenu>> getCaptainMenu(
+    int outletId, {
+    String? filter,
+  }) async {
+    final path = filter != null && filter.isNotEmpty
+        ? ApiEndpoints.captainMenuFiltered(outletId, filter)
+        : ApiEndpoints.captainMenu(outletId);
     return _api.get(
-      ApiEndpoints.captainMenu(outletId),
+      path,
       parser: (json) => CaptainMenu.fromJson(json as Map<String, dynamic>),
     );
   }
@@ -51,7 +57,9 @@ class MenuRepository {
   }
 
   /// Get items by category
-  Future<ApiResult<List<ApiMenuItem>>> getItemsByCategory(int categoryId) async {
+  Future<ApiResult<List<ApiMenuItem>>> getItemsByCategory(
+    int categoryId,
+  ) async {
     return _api.getList(
       ApiEndpoints.itemsByCategory(categoryId),
       parser: ApiMenuItem.fromJson,
@@ -74,11 +82,21 @@ class MenuRepository {
     );
   }
 
-  /// Search items
-  Future<ApiResult<List<ApiMenuItem>>> searchItems(int outletId, String query) async {
-    return _api.getList(
-      ApiEndpoints.searchItems(outletId, query),
-      parser: ApiMenuItem.fromJson,
+  /// Search menu items with optional filter
+  Future<ApiResult<MenuSearchResponse>> searchMenuItems(
+    int outletId,
+    String query, {
+    String? filter,
+  }) async {
+    final params = <String, dynamic>{'q': query};
+    if (filter != null && filter.isNotEmpty) {
+      params['filter'] = filter;
+    }
+    return _api.get(
+      ApiEndpoints.searchItems(outletId),
+      queryParams: params,
+      parser: (json) =>
+          MenuSearchResponse.fromJson(json as Map<String, dynamic>),
     );
   }
 
@@ -106,7 +124,8 @@ class MenuRepository {
     return _api.post(
       ApiEndpoints.calculateItem,
       data: request.toJson(),
-      parser: (json) => CalculateItemResponse.fromJson(json as Map<String, dynamic>),
+      parser: (json) =>
+          CalculateItemResponse.fromJson(json as Map<String, dynamic>),
     );
   }
 }

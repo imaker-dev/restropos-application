@@ -6,6 +6,7 @@ import '../../../../core/network/api_service.dart';
 import '../../../../core/network/websocket_service.dart';
 import '../../../../core/utils/responsive_utils.dart';
 import '../../../../shared/widgets/widgets.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../layout/data/models/layout_models.dart';
 import '../../domain/entities/table_entity.dart';
 import '../providers/tables_provider.dart';
@@ -78,6 +79,14 @@ class TableViewScreen extends ConsumerWidget {
                                       table,
                                       deviceType,
                                     ),
+                                    onDoubleTap:
+                                        table.status != TableStatus.available
+                                        ? () => _onTableDoubleTap(
+                                            context,
+                                            ref,
+                                            table,
+                                          )
+                                        : null,
                                     onLongPress: () =>
                                         _onTableLongPress(context, ref, table),
                                   );
@@ -406,6 +415,33 @@ class TableViewScreen extends ConsumerWidget {
         ref: ref,
       );
     }
+  }
+
+  /// Double tap: go directly to order screen (skip popup)
+  /// Only allows navigation if the current captain owns this table.
+  /// Silently ignores double-tap for other captains.
+  void _onTableDoubleTap(
+    BuildContext context,
+    WidgetRef ref,
+    RestaurantTable table,
+  ) {
+    final currentUser = ref.read(currentUserProvider);
+    final currentUserId = currentUser?.id?.toString();
+
+    // Only allow the captain who owns this table to double-tap into the order
+    // If another captain owns it, silently ignore (no error, no navigation)
+    if (table.lockedByUserId != null &&
+        table.lockedByUserId!.isNotEmpty &&
+        currentUserId != null &&
+        table.lockedByUserId != currentUserId) {
+      return; // Silent - not this captain's table
+    }
+
+    HapticFeedback.mediumImpact();
+    ref.read(selectedTableProvider.notifier).state = table.id;
+
+    // Navigate to order screen
+    onTableSelected?.call();
   }
 
   void _onTableLongPress(

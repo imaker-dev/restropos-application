@@ -96,21 +96,23 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
   Future<ApiResult<ApiOrder>> createOrder({
     required int tableId,
     required int guestCount,
-    required List<CreateOrderItemRequest> items,
+    int? floorId,
+    int? sectionId,
     String? customerName,
     String? customerPhone,
-    String? notes,
+    String? specialInstructions,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
 
     final result = await _repository.createOrder(
       tableId: tableId,
       outletId: _outletId,
-      covers: guestCount,
-      items: items,
+      guestCount: guestCount,
+      floorId: floorId,
+      sectionId: sectionId,
       customerName: customerName,
       customerPhone: customerPhone,
-      notes: notes,
+      specialInstructions: specialInstructions,
     );
 
     result.when(
@@ -258,14 +260,19 @@ class KotNotifier extends StateNotifier<KotState> {
     );
   }
 
-  Future<ApiResult<ApiKot>> sendKot(int orderId) async {
+  Future<ApiResult<SendKotResponse>> sendKot(int orderId) async {
     state = state.copyWith(isLoading: true, error: null);
 
     final result = await _repository.sendKot(orderId);
 
     result.when(
-      success: (kot, _) {
-        state = state.copyWith(isLoading: false, kots: [...state.kots, kot]);
+      success: (response, _) {
+        // Add all tickets from the response to our KOT list
+        final newKots = response.tickets;
+        state = state.copyWith(
+          isLoading: false,
+          kots: [...state.kots, ...newKots],
+        );
       },
       failure: (message, _, __) {
         state = state.copyWith(isLoading: false, error: message);

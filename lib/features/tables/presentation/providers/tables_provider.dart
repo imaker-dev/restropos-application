@@ -305,8 +305,10 @@ class TablesNotifier extends StateNotifier<TablesState> {
       capacity: apiTable.capacity ?? 4,
       sortOrder: apiTable.id, // Use ID as sort order fallback
       guestCount: apiTable.currentCovers,
-      runningTotal: apiTable.orderTotal,
+      runningTotal: apiTable.orderTotal ?? apiTable.runningTotal,
       orderStartedAt: apiTable.sessionStart,
+      lockedByUserId: apiTable.captainId?.toString(),
+      lockedByUserName: apiTable.captainName,
     );
   }
 
@@ -541,6 +543,12 @@ class TablesNotifier extends StateNotifier<TablesState> {
         );
 
         // Build updated table with all available data
+        // Extract running total from various possible fields
+        final orderTotal =
+            (data['orderTotal'] as num?)?.toDouble() ??
+            (data['order_total'] as num?)?.toDouble() ??
+            (data['runningTotal'] as num?)?.toDouble();
+
         return table.copyWith(
           status: status,
           guestCount:
@@ -549,6 +557,14 @@ class TablesNotifier extends StateNotifier<TablesState> {
               (event == 'session_started' || status == TableStatus.occupied)
               ? DateTime.now()
               : table.orderStartedAt,
+          runningTotal: orderTotal ?? table.runningTotal,
+          lockedByUserId:
+              (data['captainId'] ?? data['captain_id'])?.toString() ??
+              table.lockedByUserId,
+          lockedByUserName:
+              (data['captainName'] as String?) ??
+              (data['captain_name'] as String?) ??
+              table.lockedByUserName,
         );
       }
       return table;
@@ -620,7 +636,7 @@ class TablesNotifier extends StateNotifier<TablesState> {
   }
 
   /// Handle order:updated WebSocket event
-  /// Payload: { type, outletId, orderId, tableId, status }
+  /// Payload: { type, outletId, orderId, tableId, status, orderTotal, ... }
   void handleOrderUpdate(Map<String, dynamic> data) {
     final tableId = data['tableId']?.toString();
     final type = data['type'] as String?;
@@ -641,6 +657,13 @@ class TablesNotifier extends StateNotifier<TablesState> {
       return;
     }
 
+    // Extract running total from order update
+    final orderTotal =
+        (data['orderTotal'] as num?)?.toDouble() ??
+        (data['order_total'] as num?)?.toDouble() ??
+        (data['total'] as num?)?.toDouble() ??
+        (data['grandTotal'] as num?)?.toDouble();
+
     final tableStatus = _mapApiStatusToTableStatus(status);
     bool found = false;
 
@@ -648,9 +671,12 @@ class TablesNotifier extends StateNotifier<TablesState> {
       if (table.id == tableId) {
         found = true;
         debugPrint(
-          '[TablesNotifier] Updating table ${table.name} from ${table.status} to $tableStatus (order: $type)',
+          '[TablesNotifier] Updating table ${table.name} from ${table.status} to $tableStatus (order: $type, total: $orderTotal)',
         );
-        return table.copyWith(status: tableStatus);
+        return table.copyWith(
+          status: tableStatus,
+          runningTotal: orderTotal ?? table.runningTotal,
+        );
       }
       return table;
     }).toList();
@@ -693,7 +719,14 @@ class TablesNotifier extends StateNotifier<TablesState> {
         debugPrint(
           '[TablesNotifier] Updating table ${table.name} from ${table.status} to $tableStatus (bill: $billStatus)',
         );
-        return table.copyWith(status: tableStatus);
+        // Extract grand total from bill event
+        final grandTotal =
+            (data['grandTotal'] as num?)?.toDouble() ??
+            (data['grand_total'] as num?)?.toDouble();
+        return table.copyWith(
+          status: tableStatus,
+          runningTotal: grandTotal ?? table.runningTotal,
+        );
       }
       return table;
     }).toList();

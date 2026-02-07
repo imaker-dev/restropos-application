@@ -7,6 +7,7 @@ class OrderItemTile extends StatelessWidget {
   final VoidCallback? onIncrement;
   final VoidCallback? onDecrement;
   final VoidCallback? onRemove;
+  final VoidCallback? onTap;
   final bool showKotInfo;
 
   const OrderItemTile({
@@ -15,141 +16,168 @@ class OrderItemTile extends StatelessWidget {
     this.onIncrement,
     this.onDecrement,
     this.onRemove,
+    this.onTap,
     this.showKotInfo = true,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.xs,
-      ),
-      decoration: BoxDecoration(
-        color: item.hasKot
-            ? AppColors.success.withValues(alpha: 0.05)
-            : Colors.transparent,
-        border: Border(
-          bottom: BorderSide(color: AppColors.divider.withValues(alpha: 0.5)),
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
         ),
-      ),
-      child: Row(
-        children: [
-          // Remove button (only for pending items) or lock indicator for KOT items
-          if (item.canModify)
-            GestureDetector(
-              onTap: onRemove,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                child: const Icon(
-                  Icons.close,
-                  size: 16,
-                  color: AppColors.error,
-                ),
-              ),
-            )
-          else
-            Tooltip(
-              message: 'Item sent to kitchen (locked)',
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                child: Icon(
-                  Icons.lock,
-                  size: 14,
-                  color: AppColors.warning.withValues(alpha: 0.8),
-                ),
-              ),
-            ),
-          const SizedBox(width: AppSpacing.xs),
-          // Item details
-          Expanded(
-            flex: 3,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.variantName != null
-                      ? '${item.name} (${item.variantName})'
-                      : item.name,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (item.addons.isNotEmpty)
-                  Text(
-                    item.addons.map((a) => a.name).join(', '),
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-              ],
-            ),
+        decoration: BoxDecoration(
+          color: item.hasKot
+              ? AppColors.success.withValues(alpha: 0.05)
+              : Colors.transparent,
+          border: Border(
+            bottom: BorderSide(color: AppColors.divider.withValues(alpha: 0.5)),
           ),
-          // Quantity controls
-          Expanded(
-            flex: 2,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
+                // Remove button (only for pending items) or lock indicator for KOT items
                 if (item.canModify)
-                  _QuantityButton(
-                    icon: Icons.remove,
-                    onTap: onDecrement,
+                  GestureDetector(
+                    onTap: onRemove,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      child: const Icon(
+                        Icons.close,
+                        size: 16,
+                        color: AppColors.error,
+                      ),
+                    ),
                   )
                 else
-                  const SizedBox(width: 28),
-                Container(
-                  width: 32,
-                  alignment: Alignment.center,
-                  child: Text(
-                    '${item.quantity}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+                  Tooltip(
+                    message: 'Item sent to kitchen (locked)',
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      child: Icon(
+                        Icons.lock,
+                        size: 14,
+                        color: AppColors.warning.withValues(alpha: 0.8),
+                      ),
                     ),
                   ),
-                ),
-                if (item.canModify)
-                  _QuantityButton(
-                    icon: Icons.add,
-                    onTap: onIncrement,
-                  )
-                else
-                  const SizedBox(width: 28),
-              ],
-            ),
-          ),
-          // Price
-          Expanded(
-            flex: 1,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '₹${item.itemTotal.toStringAsFixed(0)}',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                const SizedBox(width: AppSpacing.xs),
+                // Item details
+                Expanded(
+                  flex: 3,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.variantName != null
+                            ? '${item.name} (${item.variantName})'
+                            : item.name,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (item.addons.isNotEmpty)
+                        Text(
+                          item.addons.map((a) => a.name).join(', '),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
                   ),
                 ),
-                if (item.quantity > 1)
-                  Text(
-                    '₹${item.unitPrice.toStringAsFixed(0)}',
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: AppColors.textSecondary,
+                // Quantity controls
+                Expanded(
+                  flex: 2,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (item.canModify)
+                        _QuantityButton(icon: Icons.remove, onTap: onDecrement)
+                      else
+                        const SizedBox(width: 28),
+                      Container(
+                        width: 32,
+                        alignment: Alignment.center,
+                        child: Text(
+                          '${item.quantity}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      if (item.canModify)
+                        _QuantityButton(icon: Icons.add, onTap: onIncrement)
+                      else
+                        const SizedBox(width: 28),
+                    ],
+                  ),
+                ),
+                // Price
+                Expanded(
+                  flex: 1,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '₹${item.itemTotal.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (item.quantity > 1)
+                        Text(
+                          '₹${item.unitPrice.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            // Special instructions
+            if (item.specialInstructions != null &&
+                item.specialInstructions!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(left: 28, top: 2),
+                child: Row(
+                  children: [
+                    const Icon(Icons.notes, size: 12, color: AppColors.info),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        item.specialInstructions!,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontStyle: FontStyle.italic,
+                          color: AppColors.info,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-              ],
-            ),
-          ),
-        ],
+                  ],
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -159,10 +187,7 @@ class _QuantityButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onTap;
 
-  const _QuantityButton({
-    required this.icon,
-    this.onTap,
-  });
+  const _QuantityButton({required this.icon, this.onTap});
 
   @override
   Widget build(BuildContext context) {
