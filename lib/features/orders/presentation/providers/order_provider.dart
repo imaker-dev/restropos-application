@@ -8,15 +8,15 @@ const _uuid = Uuid();
 
 // Current order provider (for the active table)
 final currentOrderProvider =
-StateNotifierProvider<CurrentOrderNotifier, Order?>((ref) {
-  return CurrentOrderNotifier();
-});
+    StateNotifierProvider<CurrentOrderNotifier, Order?>((ref) {
+      return CurrentOrderNotifier();
+    });
 
 // All orders provider
 final ordersProvider =
-StateNotifierProvider<OrdersNotifier, Map<String, Order>>((ref) {
-  return OrdersNotifier();
-});
+    StateNotifierProvider<OrdersNotifier, Map<String, Order>>((ref) {
+      return OrdersNotifier();
+    });
 
 // Order by table ID
 final orderByTableProvider = Provider.family<Order?, String>((ref, tableId) {
@@ -25,6 +25,11 @@ final orderByTableProvider = Provider.family<Order?, String>((ref, tableId) {
       .where((o) => o.tableId == tableId && o.isActive)
       .firstOrNull;
 });
+
+// Order action button state providers (reactive across widget trees - e.g. bottom sheets)
+final orderSavingProvider = StateProvider<bool>((ref) => false);
+final orderSendingKotProvider = StateProvider<bool>((ref) => false);
+final orderKotEnabledProvider = StateProvider<bool>((ref) => false);
 
 // KOTs provider
 final kotsProvider = StateNotifierProvider<KotsNotifier, List<Kot>>((ref) {
@@ -87,11 +92,15 @@ class CurrentOrderNotifier extends StateNotifier<Order?> {
         unitPrice: apiItem.unitPrice,
         variantId: apiItem.variantId?.toString(),
         variantName: apiItem.variantName,
-        addons: apiItem.addons.map((a) => SelectedAddon(
-          id: a.id.toString(),
-          name: a.name,
-          price: a.price,
-        )).toList(),
+        addons: apiItem.addons
+            .map(
+              (a) => SelectedAddon(
+                id: a.id.toString(),
+                name: a.name,
+                price: a.price,
+              ),
+            )
+            .toList(),
         specialInstructions: apiItem.specialInstructions,
         status: status,
         kotId: status != OrderItemStatus.pending ? 'kot-${apiItem.id}' : null,
@@ -125,7 +134,6 @@ class CurrentOrderNotifier extends StateNotifier<Order?> {
   OrderItemStatus _mapApiItemStatus(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
-        return OrderItemStatus.pending;
       case 'kot_generated':
       case 'sent':
         return OrderItemStatus.kotGenerated;
@@ -173,11 +181,12 @@ class CurrentOrderNotifier extends StateNotifier<Order?> {
   }
 
   void addItem(
-      ApiMenuItem menuItem, {
-        ApiItemVariant? variant,
-        List<ApiItemAddon>? addons,
-        int quantity = 1,
-      }) {
+    ApiMenuItem menuItem, {
+    ApiItemVariant? variant,
+    List<ApiItemAddon>? addons,
+    int quantity = 1,
+    String? specialInstructions,
+  }) {
     if (state == null) return;
 
     final now = DateTime.now();
@@ -189,16 +198,17 @@ class CurrentOrderNotifier extends StateNotifier<Order?> {
       unitPrice: variant?.price ?? menuItem.price,
       variantId: variant?.id.toString(),
       variantName: variant?.name,
+      specialInstructions: specialInstructions,
       addons:
-      addons
-          ?.map(
-            (a) => SelectedAddon(
-          id: a.id.toString(),
-          name: a.name,
-          price: a.price,
-        ),
-      )
-          .toList() ??
+          addons
+              ?.map(
+                (a) => SelectedAddon(
+                  id: a.id.toString(),
+                  name: a.name,
+                  price: a.price,
+                ),
+              )
+              .toList() ??
           [],
       status: OrderItemStatus.pending,
       createdAt: now,
@@ -206,6 +216,34 @@ class CurrentOrderNotifier extends StateNotifier<Order?> {
     );
 
     final updatedItems = [...state!.items, orderItem];
+    state = state!.copyWith(items: updatedItems).recalculate();
+  }
+
+  void updateItemDetails({
+    required String itemId,
+    String? variantId,
+    String? variantName,
+    double? unitPrice,
+    List<SelectedAddon>? addons,
+    String? specialInstructions,
+    int? quantity,
+  }) {
+    if (state == null) return;
+
+    final updatedItems = state!.items.map((item) {
+      if (item.id == itemId && item.canModify) {
+        return item.copyWith(
+          variantId: variantId ?? item.variantId,
+          variantName: variantName ?? item.variantName,
+          unitPrice: unitPrice ?? item.unitPrice,
+          addons: addons ?? item.addons,
+          specialInstructions: specialInstructions,
+          quantity: quantity ?? item.quantity,
+        );
+      }
+      return item;
+    }).toList();
+
     state = state!.copyWith(items: updatedItems).recalculate();
   }
 

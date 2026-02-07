@@ -7,21 +7,25 @@ import 'order_item_tile.dart';
 
 class OrderSummaryPanel extends ConsumerWidget {
   final VoidCallback? onSave;
-  final VoidCallback? onSaveAndPrint;
   final VoidCallback? onKot;
-  final VoidCallback? onKotPrint;
+  final VoidCallback? onBill;
+  final Function(OrderItem item)? onItemTap;
 
   const OrderSummaryPanel({
     super.key,
     this.onSave,
-    this.onSaveAndPrint,
     this.onKot,
-    this.onKotPrint,
+    this.onBill,
+    this.onItemTap,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final order = ref.watch(currentOrderProvider);
+    // Watch reactive button state providers
+    final isSaving = ref.watch(orderSavingProvider);
+    final isSendingKot = ref.watch(orderSendingKotProvider);
+    final kotEnabled = ref.watch(orderKotEnabledProvider);
 
     if (order == null) {
       return _buildEmptyState();
@@ -49,10 +53,15 @@ class OrderSummaryPanel extends ConsumerWidget {
                 : _buildItemsList(ref, order),
           ),
           const Divider(height: 1),
-          // Payment options
-          _buildPaymentOptions(order),
+          // Total display
+          _buildTotalBar(order),
           // Action buttons
-          _buildActionButtons(order),
+          _buildActionButtons(
+            order,
+            isSaving: isSaving,
+            isSendingKot: isSendingKot,
+            kotEnabled: kotEnabled,
+          ),
         ],
       ),
     );
@@ -65,11 +74,7 @@ class OrderSummaryPanel extends ConsumerWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.restaurant_menu,
-              size: 64,
-              color: AppColors.textHint,
-            ),
+            Icon(Icons.restaurant_menu, size: 64, color: AppColors.textHint),
             SizedBox(height: AppSpacing.md),
             Text(
               'No order available',
@@ -83,10 +88,7 @@ class OrderSummaryPanel extends ConsumerWidget {
             Text(
               'Please Select Item from Left Menu Item\nand create new order',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.textHint,
-              ),
+              style: TextStyle(fontSize: 12, color: AppColors.textHint),
             ),
           ],
         ),
@@ -99,18 +101,11 @@ class OrderSummaryPanel extends ConsumerWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.restaurant_menu,
-            size: 48,
-            color: AppColors.textHint,
-          ),
+          Icon(Icons.restaurant_menu, size: 48, color: AppColors.textHint),
           SizedBox(height: AppSpacing.sm),
           Text(
             'No items in order',
-            style: TextStyle(
-              fontSize: 14,
-              color: AppColors.textSecondary,
-            ),
+            style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
           ),
         ],
       ),
@@ -128,10 +123,7 @@ class OrderSummaryPanel extends ConsumerWidget {
           children: [
             const Text(
               'Order',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
             ),
             const SizedBox(width: 8),
             Text(
@@ -142,7 +134,8 @@ class OrderSummaryPanel extends ConsumerWidget {
               ),
             ),
             // Show customer name if set
-            if (order.customerName != null && order.customerName!.isNotEmpty) ...[
+            if (order.customerName != null &&
+                order.customerName!.isNotEmpty) ...[
               const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -153,7 +146,11 @@ class OrderSummaryPanel extends ConsumerWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.person, size: 12, color: AppColors.success),
+                    const Icon(
+                      Icons.person,
+                      size: 12,
+                      color: AppColors.success,
+                    ),
                     const SizedBox(width: 2),
                     Text(
                       order.customerName!,
@@ -171,14 +168,18 @@ class OrderSummaryPanel extends ConsumerWidget {
             // Customer icon - Add customer
             IconButton(
               icon: Icon(
-                order.customerName != null ? Icons.person : Icons.person_add_outlined,
+                order.customerName != null
+                    ? Icons.person
+                    : Icons.person_add_outlined,
                 size: 18,
                 color: order.customerName != null ? AppColors.success : null,
               ),
               onPressed: () => _showCustomerDialog(context, ref, order),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-              tooltip: order.customerName != null ? 'Edit Customer' : 'Add Customer',
+              tooltip: order.customerName != null
+                  ? 'Edit Customer'
+                  : 'Add Customer',
             ),
             // Note icon - Add note
             IconButton(
@@ -209,8 +210,12 @@ class OrderSummaryPanel extends ConsumerWidget {
   }
 
   void _showCustomerDialog(BuildContext context, WidgetRef ref, Order order) {
-    final nameController = TextEditingController(text: order.customerName ?? '');
-    final phoneController = TextEditingController(text: order.customerPhone ?? '');
+    final nameController = TextEditingController(
+      text: order.customerName ?? '',
+    );
+    final phoneController = TextEditingController(
+      text: order.customerPhone ?? '',
+    );
 
     showDialog(
       context: context,
@@ -250,10 +255,16 @@ class OrderSummaryPanel extends ConsumerWidget {
           ),
           FilledButton(
             onPressed: () {
-              ref.read(currentOrderProvider.notifier).updateCustomerDetails(
-                name: nameController.text.trim().isEmpty ? null : nameController.text.trim(),
-                phone: phoneController.text.trim().isEmpty ? null : phoneController.text.trim(),
-              );
+              ref
+                  .read(currentOrderProvider.notifier)
+                  .updateCustomerDetails(
+                    name: nameController.text.trim().isEmpty
+                        ? null
+                        : nameController.text.trim(),
+                    phone: phoneController.text.trim().isEmpty
+                        ? null
+                        : phoneController.text.trim(),
+                  );
               Navigator.pop(ctx);
             },
             child: const Text('Save'),
@@ -287,9 +298,13 @@ class OrderSummaryPanel extends ConsumerWidget {
           ),
           FilledButton(
             onPressed: () {
-              ref.read(currentOrderProvider.notifier).updateNotes(
-                notesController.text.trim().isEmpty ? null : notesController.text.trim(),
-              );
+              ref
+                  .read(currentOrderProvider.notifier)
+                  .updateNotes(
+                    notesController.text.trim().isEmpty
+                        ? null
+                        : notesController.text.trim(),
+                  );
               Navigator.pop(ctx);
             },
             child: const Text('Save'),
@@ -300,7 +315,7 @@ class OrderSummaryPanel extends ConsumerWidget {
   }
 
   Widget _buildOrderTypeTabs(Order order) {
-    return Container(
+    return SizedBox(
       height: 40,
       child: Row(
         children: [
@@ -311,15 +326,14 @@ class OrderSummaryPanel extends ConsumerWidget {
           _OrderTypeTab(
             label: 'Delivery',
             isSelected: order.type == OrderType.delivery,
+            isDisabled: true,
           ),
           _OrderTypeTab(
-            label: 'History',
-            isSelected: order.type == OrderType.history,
+            label: 'Pick Up',
+            isSelected: order.type == OrderType.pickUp,
+            isDisabled: true,
           ),
-          _OrderTypeTab(
-            label: 'KOT',
-            isSelected: false,
-          ),
+          _OrderTypeTab(label: 'KOT', isSelected: false, isDisabled: true),
         ],
       ),
     );
@@ -370,10 +384,7 @@ class OrderSummaryPanel extends ConsumerWidget {
           const Spacer(),
           // Order type badge
           Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 6,
-              vertical: 2,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
               color: AppColors.secondary,
               borderRadius: BorderRadius.circular(4),
@@ -475,9 +486,12 @@ class OrderSummaryPanel extends ConsumerWidget {
               ),
             ),
           ),
-          ...kotItems.map((item) => OrderItemTile(
-            item: item,
-          )),
+          ...kotItems.map(
+            (item) => OrderItemTile(
+              item: item,
+              onTap: onItemTap != null ? () => onItemTap!(item) : null,
+            ),
+          ),
         ],
         // Pending items
         if (pendingItems.isNotEmpty) ...[
@@ -497,129 +511,119 @@ class OrderSummaryPanel extends ConsumerWidget {
                 ),
               ),
             ),
-          ...pendingItems.map((item) => OrderItemTile(
-            item: item,
-            onIncrement: () => ref.read(currentOrderProvider.notifier)
-                .updateItemQuantity(item.id, item.quantity + 1),
-            onDecrement: () => ref.read(currentOrderProvider.notifier)
-                .updateItemQuantity(item.id, item.quantity - 1),
-            onRemove: () => ref.read(currentOrderProvider.notifier)
-                .removeItem(item.id),
-          )),
+          ...pendingItems.map(
+            (item) => OrderItemTile(
+              item: item,
+              onIncrement: () => ref
+                  .read(currentOrderProvider.notifier)
+                  .updateItemQuantity(item.id, item.quantity + 1),
+              onDecrement: () => ref
+                  .read(currentOrderProvider.notifier)
+                  .updateItemQuantity(item.id, item.quantity - 1),
+              onRemove: () =>
+                  ref.read(currentOrderProvider.notifier).removeItem(item.id),
+              onTap: onItemTap != null ? () => onItemTap!(item) : null,
+            ),
+          ),
         ],
       ],
     );
   }
 
-  Widget _buildPaymentOptions(Order order) {
+  Widget _buildTotalBar(Order order) {
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      child: Column(
-        children: [
-          // Total display - Full width
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.sm,
-            ),
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.sm,
+      ),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.primary,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
               children: [
-                const Row(
+                const Icon(Icons.receipt_long, size: 18, color: Colors.white),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.calculate, size: 20, color: Colors.white),
-                    SizedBox(width: 8),
-                    Text(
+                    const Text(
                       'Total',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.white,
+                      style: TextStyle(fontSize: 11, color: Colors.white70),
+                    ),
+                    Text(
+                      '${order.totalItems} items',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: Colors.white60,
                       ),
                     ),
                   ],
                 ),
-                Text(
-                  '₹${order.grandTotal.toStringAsFixed(0)}',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
               ],
             ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          // Payment mode chips - Scrollable
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: const [
-                _PaymentModeChip(label: 'Cash', isSelected: true),
-                _PaymentModeChip(label: 'Card', isSelected: false),
-                _PaymentModeChip(label: 'UPI', isSelected: false),
-                _PaymentModeChip(label: 'Due', isSelected: false),
-                _PaymentModeChip(label: 'Split', isSelected: false),
-              ],
+            Text(
+              '\u20b9${order.grandTotal.toStringAsFixed(0)}',
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildActionButtons(Order order) {
+  Widget _buildActionButtons(
+    Order order, {
+    required bool isSaving,
+    required bool isSendingKot,
+    required bool kotEnabled,
+  }) {
+    final saveEnabled = onSave != null && order.hasPendingItems && !isSaving;
+    final kotBtnEnabled = onKot != null && kotEnabled && !isSendingKot;
+    final billEnabled = onBill != null && order.hasKotItems;
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.sm),
-      child: Column(
+      child: Row(
         children: [
-          // First row - Save actions
-          Row(
-            children: [
-              Expanded(
-                child: _ActionBtn(
-                  text: 'Save',
-                  color: AppColors.info,
-                  onPressed: onSave,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: _ActionBtn(
-                  text: 'Print',
-                  color: AppColors.info,
-                  onPressed: onSaveAndPrint,
-                ),
-              ),
-            ],
+          // Save button
+          Expanded(
+            child: _ActionBtn(
+              text: isSaving ? 'Saving...' : 'Save',
+              color: saveEnabled ? AppColors.info : AppColors.textHint,
+              onPressed: saveEnabled ? onSave : null,
+            ),
           ),
-          const SizedBox(height: 6),
-          // Second row - KOT actions
-          Row(
-            children: [
-              Expanded(
-                flex: 2,
-                child: _ActionBtn(
-                  text: 'KOT',
-                  color: order.hasPendingItems ? AppColors.success : AppColors.textHint,
-                  onPressed: order.hasPendingItems ? onKot : null,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                flex: 2,
-                child: _ActionBtn(
-                  text: 'KOT + Print',
-                  color: order.hasPendingItems ? AppColors.secondary : AppColors.textHint,
-                  onPressed: order.hasPendingItems ? onKotPrint : null,
-                ),
-              ),
-            ],
+          const SizedBox(width: 6),
+          // KOT button
+          Expanded(
+            child: _ActionBtn(
+              text: isSendingKot ? 'Sending...' : 'KOT',
+              color: kotBtnEnabled ? AppColors.success : AppColors.textHint,
+              onPressed: kotBtnEnabled ? onKot : null,
+            ),
+          ),
+          const SizedBox(width: 6),
+          // Bill button
+          Expanded(
+            child: _ActionBtn(
+              text: 'Bill',
+              color: billEnabled ? AppColors.secondary : AppColors.textHint,
+              onPressed: billEnabled ? onBill : null,
+            ),
           ),
         ],
       ),
@@ -630,31 +634,44 @@ class OrderSummaryPanel extends ConsumerWidget {
 class _OrderTypeTab extends StatelessWidget {
   final String label;
   final bool isSelected;
+  final bool isDisabled;
 
   const _OrderTypeTab({
     required this.label,
     required this.isSelected,
+    this.isDisabled = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Container(
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: isSelected ? AppColors.primary : Colors.transparent,
-              width: 2,
+      child: Opacity(
+        opacity: isDisabled ? 0.4 : 1.0,
+        child: Container(
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: isSelected && !isDisabled
+                    ? AppColors.primary
+                    : Colors.transparent,
+                width: 2,
+              ),
             ),
           ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-            color: isSelected ? AppColors.primary : AppColors.textSecondary,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: isSelected && !isDisabled
+                  ? FontWeight.w600
+                  : FontWeight.w400,
+              color: isDisabled
+                  ? AppColors.textHint
+                  : isSelected
+                  ? AppColors.primary
+                  : AppColors.textSecondary,
+            ),
           ),
         ),
       ),
@@ -667,11 +684,7 @@ class _ActionBtn extends StatelessWidget {
   final Color color;
   final VoidCallback? onPressed;
 
-  const _ActionBtn({
-    required this.text,
-    required this.color,
-    this.onPressed,
-  });
+  const _ActionBtn({required this.text, required this.color, this.onPressed});
 
   @override
   Widget build(BuildContext context) {
@@ -683,53 +696,13 @@ class _ActionBtn extends StatelessWidget {
           backgroundColor: color,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 8),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
         child: Text(
           text,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
           overflow: TextOverflow.ellipsis,
         ),
-      ),
-    );
-  }
-}
-
-class _PaymentModeChip extends StatelessWidget {
-  final String label;
-  final bool isSelected;
-
-  const _PaymentModeChip({
-    required this.label,
-    required this.isSelected,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: AppSpacing.sm),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
-            size: 14,
-            color: isSelected ? AppColors.primary : AppColors.textSecondary,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              color: isSelected ? AppColors.primary : AppColors.textSecondary,
-            ),
-          ),
-        ],
       ),
     );
   }

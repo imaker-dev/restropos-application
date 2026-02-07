@@ -49,17 +49,28 @@ class CategoryList extends ConsumerWidget {
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-          itemCount: categories.length,
+          itemCount: categories.length + 1, // +1 for "All"
           itemBuilder: (context, index) {
-            final category = categories[index];
+            if (index == 0) {
+              // "All" chip
+              return Padding(
+                padding: const EdgeInsets.only(right: AppSpacing.xs),
+                child: _AllCategoryChip(
+                  isSelected: selectedCategoryId == null,
+                  onTap: () =>
+                      ref.read(menuProvider.notifier).selectCategory(null),
+                ),
+              );
+            }
+            final category = categories[index - 1];
             final isSelected = category.id == selectedCategoryId;
             return Padding(
               padding: const EdgeInsets.only(right: AppSpacing.xs),
               child: _CategoryChip(
                 category: category,
                 isSelected: isSelected,
-                onTap: () => ref.read(selectedCategoryProvider.notifier).state =
-                    category.id,
+                onTap: () =>
+                    ref.read(menuProvider.notifier).selectCategory(category.id),
               ),
             );
           },
@@ -71,15 +82,23 @@ class CategoryList extends ConsumerWidget {
       color: AppColors.secondary,
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-        itemCount: categories.length,
+        itemCount: categories.length + 1, // +1 for "All"
         itemBuilder: (context, index) {
-          final category = categories[index];
+          if (index == 0) {
+            // "All" tile
+            return _AllCategoryTile(
+              isSelected: selectedCategoryId == null,
+              itemCount: menuState.items.length,
+              onTap: () => ref.read(menuProvider.notifier).selectCategory(null),
+            );
+          }
+          final category = categories[index - 1];
           final isSelected = category.id == selectedCategoryId;
           return _CategoryTile(
             category: category,
             isSelected: isSelected,
             onTap: () =>
-                ref.read(selectedCategoryProvider.notifier).state = category.id,
+                ref.read(menuProvider.notifier).selectCategory(category.id),
           );
         },
       ),
@@ -118,6 +137,91 @@ class _CategoryChip extends StatelessWidget {
               fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
               color: isSelected ? Colors.white : AppColors.textPrimary,
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AllCategoryChip extends StatelessWidget {
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _AllCategoryChip({required this.isSelected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: isSelected ? AppColors.primary : AppColors.surface,
+      borderRadius: AppSpacing.borderRadiusSm,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppSpacing.borderRadiusSm,
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm,
+          ),
+          child: Text(
+            'All',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+              color: isSelected ? Colors.white : AppColors.textPrimary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AllCategoryTile extends StatelessWidget {
+  final bool isSelected;
+  final int itemCount;
+  final VoidCallback onTap;
+
+  const _AllCategoryTile({
+    required this.isSelected,
+    required this.itemCount,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: isSelected ? AppColors.primary : Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm,
+          ),
+          child: Row(
+            children: [
+              if (isSelected)
+                Container(
+                  width: 3,
+                  height: 20,
+                  margin: const EdgeInsets.only(right: AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              const Expanded(
+                child: Text(
+                  'All',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),

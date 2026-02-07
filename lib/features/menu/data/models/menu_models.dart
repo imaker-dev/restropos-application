@@ -535,6 +535,84 @@ class MenuSummary {
   }
 }
 
+/// Search API response model
+class MenuSearchResponse {
+  final String query;
+  final List<ApiCategory> matchingCategories;
+  final List<ApiMenuItem> matchingItems;
+  final int totalCategories;
+  final int totalItems;
+
+  const MenuSearchResponse({
+    required this.query,
+    this.matchingCategories = const [],
+    this.matchingItems = const [],
+    this.totalCategories = 0,
+    this.totalItems = 0,
+  });
+
+  factory MenuSearchResponse.fromJson(Map<String, dynamic> json) {
+    return MenuSearchResponse(
+      query: json['query'] as String? ?? '',
+      matchingCategories:
+          (json['matchingCategories'] as List?)
+              ?.map((e) => ApiCategory.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+      matchingItems:
+          (json['matchingItems'] as List?)
+              ?.map((e) => ApiMenuItem.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+      totalCategories: json['totalCategories'] as int? ?? 0,
+      totalItems: json['totalItems'] as int? ?? 0,
+    );
+  }
+
+  /// Get all items: items directly matched + items inside matched categories
+  List<ApiMenuItem> get allItems {
+    final result = <ApiMenuItem>[];
+    // Add items from matching categories
+    for (final cat in matchingCategories) {
+      if (cat.items != null) {
+        for (final item in cat.items!) {
+          if (item.categoryId == 0) {
+            result.add(
+              ApiMenuItem(
+                id: item.id,
+                name: item.name,
+                shortName: item.shortName,
+                shortCode: item.shortCode,
+                description: item.description,
+                image: item.image,
+                price: item.price,
+                basePrice: item.basePrice,
+                categoryId: cat.id,
+                categoryName: cat.name,
+                itemType: item.itemType,
+                isAvailable: item.isAvailable,
+                isVeg: item.isVeg,
+                hasVariants: item.hasVariants,
+                hasAddons: item.hasAddons,
+                preparationTime: item.preparationTime,
+                variants: item.variants,
+                addonGroups: item.addonGroups,
+                addons: item.addons,
+                tags: item.tags,
+              ),
+            );
+          } else {
+            result.add(item);
+          }
+        }
+      }
+    }
+    // Add directly matching items
+    result.addAll(matchingItems);
+    return result;
+  }
+}
+
 class CalculateItemRequest {
   final int itemId;
   final int quantity;

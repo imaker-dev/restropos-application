@@ -37,13 +37,14 @@ class ApiEndpoints {
 
   // ============ Menu Items ============
   static String captainMenu(int outletId) => "/menu/$outletId/captain";
+  static String captainMenuFiltered(int outletId, String filter) =>
+      "/menu/$outletId/captain?filter=$filter";
   static String menuItems(int outletId) => "/menu/items/outlet/$outletId";
   static String itemsByCategory(int categoryId) =>
       "/menu/items/category/$categoryId";
   static String itemById(int itemId) => "/menu/items/$itemId";
   static String itemDetails(int itemId) => "/menu/items/$itemId/details";
-  static String searchItems(int outletId, String query) =>
-      "/menu/$outletId/search?q=$query";
+  static String searchItems(int outletId) => "/menu/$outletId/search";
   static String featuredItems(int outletId) => "/menu/$outletId/featured";
   static const String calculateItem = "/menu/calculate";
 

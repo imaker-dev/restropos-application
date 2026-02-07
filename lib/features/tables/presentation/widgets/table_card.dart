@@ -7,6 +7,7 @@ class TableCard extends StatelessWidget {
   final RestaurantTable table;
   final bool isSelected;
   final VoidCallback? onTap;
+  final VoidCallback? onDoubleTap;
   final VoidCallback? onLongPress;
 
   const TableCard({
@@ -14,6 +15,7 @@ class TableCard extends StatelessWidget {
     required this.table,
     this.isSelected = false,
     this.onTap,
+    this.onDoubleTap,
     this.onLongPress,
   });
 
@@ -35,6 +37,12 @@ class TableCard extends StatelessWidget {
             HapticFeedback.selectionClick();
             onTap?.call();
           },
+          onDoubleTap: onDoubleTap != null
+              ? () {
+                  HapticFeedback.mediumImpact();
+                  onDoubleTap!.call();
+                }
+              : null,
           onLongPress: () {
             HapticFeedback.mediumImpact();
             onLongPress?.call();
@@ -53,12 +61,12 @@ class TableCard extends StatelessWidget {
               ),
               boxShadow: isSelected
                   ? [
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ]
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
                   : null,
             ),
             child: Stack(
@@ -92,14 +100,15 @@ class TableCard extends StatelessWidget {
                               : AppColors.textPrimary,
                         ),
                       ),
-                      if (table.runningTotal != null) ...[
+                      if (table.runningTotal != null &&
+                          table.runningTotal! > 0) ...[
                         const SizedBox(height: 2),
                         Text(
                           '₹${table.runningTotal!.toStringAsFixed(0)}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                            color: _statusColor,
                           ),
                         ),
                       ],
@@ -111,11 +120,7 @@ class TableCard extends StatelessWidget {
                   const Positioned(
                     bottom: 6,
                     right: 6,
-                    child: Icon(
-                      Icons.lock,
-                      size: 12,
-                      color: AppColors.error,
-                    ),
+                    child: Icon(Icons.lock, size: 12, color: AppColors.error),
                   ),
               ],
             ),

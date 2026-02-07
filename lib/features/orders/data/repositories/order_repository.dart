@@ -34,26 +34,28 @@ class OrderRepository {
     );
   }
 
-  /// Create new order
+  /// Create new order (without items - items added separately)
   Future<ApiResult<ApiOrder>> createOrder({
     required int tableId,
     required int outletId,
-    required int covers,
-    required List<CreateOrderItemRequest> items,
+    required int guestCount,
+    int? floorId,
+    int? sectionId,
     String orderType = 'dine_in',
     String? customerName,
     String? customerPhone,
-    String? notes,
+    String? specialInstructions,
   }) async {
     final request = CreateOrderRequest(
       tableId: tableId,
       outletId: outletId,
-      covers: covers,
+      guestCount: guestCount,
+      floorId: floorId,
+      sectionId: sectionId,
       orderType: orderType,
-      items: items,
       customerName: customerName,
       customerPhone: customerPhone,
-      notes: notes,
+      specialInstructions: specialInstructions,
     );
     return _api.post(
       ApiEndpoints.createOrder,
@@ -63,6 +65,7 @@ class OrderRepository {
   }
 
   /// Add items to existing order
+  /// Response: { order: {...}, addedItems: [...] }
   Future<ApiResult<ApiOrder>> addOrderItems({
     required int orderId,
     required List<CreateOrderItemRequest> items,
@@ -71,7 +74,14 @@ class OrderRepository {
     return _api.post(
       ApiEndpoints.addOrderItems(orderId),
       data: request.toJson(),
-      parser: (json) => ApiOrder.fromJson(json as Map<String, dynamic>),
+      parser: (json) {
+        final data = json as Map<String, dynamic>;
+        // Response wraps order in 'order' key
+        if (data.containsKey('order')) {
+          return ApiOrder.fromJson(data['order'] as Map<String, dynamic>);
+        }
+        return ApiOrder.fromJson(data);
+      },
     );
   }
 
@@ -142,10 +152,11 @@ class KotRepository {
   KotRepository(this._api);
 
   /// Send KOT
-  Future<ApiResult<ApiKot>> sendKot(int orderId) async {
+  /// Response: { orderId, orderNumber, tableNumber, tickets: [...] }
+  Future<ApiResult<SendKotResponse>> sendKot(int orderId) async {
     return _api.post(
       ApiEndpoints.sendKot(orderId),
-      parser: (json) => ApiKot.fromJson(json as Map<String, dynamic>),
+      parser: (json) => SendKotResponse.fromJson(json as Map<String, dynamic>),
     );
   }
 
